@@ -471,7 +471,8 @@ export default function EdgeOfChaosExplorer() {
               <div>
                 <div className="section-title">Signals and concentration over time</div>
                 <div className="text-sm text-muted">
-                  Mutual information estimates how much reward outcomes tell you about verified effort.
+                  <strong>MI (Mutual Information)</strong> measures how much information about reward you gain by knowing verified effort. 
+                  Near 0 bits means effort tells you nothing about reward; higher values indicate effort is informative.
                 </div>
               </div>
               <div className="stats-panel">
@@ -557,8 +558,8 @@ export default function EdgeOfChaosExplorer() {
       </Card>
 
       <div className="text-xs text-muted">
-        Notes: MI is estimated by binning effort and treating reward as the event of receiving any reward. This is a visualization aid,
-        not an econometric estimator.
+        Notes: MI = I(V;R) is estimated by binning verified effort V and treating reward R as binary (ever rewarded). 
+        Formula: I(V;R) = Σ p(v) Σ p(r|v) log(p(r|v)/p(r)). This is a visualization aid, not an econometric estimator.
       </div>
     </div>
   );
