@@ -368,7 +368,7 @@ export default function EdgeOfChaosExplorer() {
         transition={{ duration: 0.35 }}
         className="header"
       >
-        <h1 className="title">Edge of Chaos Explorer</h1>
+        <h1 className="title">Shadow Futures Simulator</h1>
         <p className="subtitle">
           Toy model for when work can be identified across regimes. Reinforcement (α) pushes toward lock-in. Effort weight (λ)
           makes transcripts matter. Churn prevents permanent state capture.
