@@ -872,11 +872,11 @@ export default function EdgeOfChaosExplorer() {
               <p style={{ fontSize: "14px", color: "#b0b0b0", lineHeight: 1.6 }}>
                 Each cell shows the system behavior at that (α, λ) combination. 
                 The <span style={{ 
-                  backgroundColor: "#fbbf24", 
-                  color: "#000", 
+                  border: "2px solid white",
                   padding: "2px 8px", 
                   borderRadius: "4px",
-                  fontWeight: 600
+                  fontWeight: 600,
+                  color: "#e5e7eb"
                 }}>highlighted cell</span> is your current position. Hover any cell for details.
               </p>
             </div>
@@ -947,14 +947,14 @@ export default function EdgeOfChaosExplorer() {
                         <div
                           key={idx}
                           className={`phase-cell ${isCurrentCell ? "phase-cell-current" : ""}`}
-                          style={{ backgroundColor: isCurrentCell ? "#fbbf24" : point.color }}
+                          style={{ backgroundColor: point.color }}
                         >
                           {isCurrentCell && (
                             <span style={{ 
                               fontSize: "14px", 
                               fontWeight: "bold",
-                              color: "#000",
-                              textShadow: "0 0 4px rgba(255,255,255,0.5)"
+                              color: "#fff",
+                              textShadow: "0 0 4px rgba(0,0,0,0.8)"
                             }}>●</span>
                           )}
                           <div className="phase-tooltip">

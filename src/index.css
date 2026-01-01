@@ -462,9 +462,10 @@ svg.lucide {
 }
 
 .phase-cell-current {
-  transform: scale(1.1);
+  transform: scale(1.05);
   z-index: 10;
-  box-shadow: 0 0 0 3px #fbbf24, 0 0 20px rgba(251, 191, 36, 0.6);
+  border: 3px solid white;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
 }
 
 /* Custom CSS Tooltip for Phase Cells */
