@@ -444,3 +444,68 @@ svg.lucide {
   width: 1em;
   height: 1em;
 }
+
+/* Phase Transition Grid Cells */
+.phase-cell {
+  cursor: pointer;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.phase-cell:not(.phase-cell-current):hover {
+  transform: scale(1.15);
+  z-index: 50;
+  filter: brightness(1.2);
+}
+
+.phase-cell-current {
+  transform: scale(1.1);
+  z-index: 10;
+  box-shadow: 0 0 0 3px #fbbf24, 0 0 20px rgba(251, 191, 36, 0.6);
+}
+
+/* Custom CSS Tooltip for Phase Cells */
+.phase-cell .phase-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  margin-bottom: 8px;
+}
+
+.phase-cell:hover .phase-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.phase-tooltip-regime {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.phase-tooltip-params {
+  color: #9ca3af;
+}
+
+.phase-tooltip-metrics {
+  color: #d1d5db;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}

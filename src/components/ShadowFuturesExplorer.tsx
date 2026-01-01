@@ -946,32 +946,8 @@ export default function EdgeOfChaosExplorer() {
                       return (
                         <div
                           key={idx}
-                          style={{ 
-                            backgroundColor: isCurrentCell ? "#fbbf24" : point.color,
-                            cursor: "pointer",
-                            transition: "all 0.15s ease",
-                            borderRadius: "3px",
-                            position: "relative",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            boxShadow: isCurrentCell ? "0 0 0 3px #fbbf24, 0 0 20px rgba(251, 191, 36, 0.6)" : "none",
-                            transform: isCurrentCell ? "scale(1.1)" : "scale(1)",
-                            zIndex: isCurrentCell ? 10 : 1
-                          }}
-                          title={`${point.regime}\nα=${point.alpha.toFixed(1)}, λ=${point.lambda.toFixed(1)}\nMI: ${point.mi.toFixed(3)} bits | Gini: ${point.gini.toFixed(3)}`}
-                          onMouseEnter={(e) => {
-                            if (!isCurrentCell) {
-                              e.currentTarget.style.transform = "scale(1.08)";
-                              e.currentTarget.style.zIndex = "5";
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isCurrentCell) {
-                              e.currentTarget.style.transform = "scale(1)";
-                              e.currentTarget.style.zIndex = "1";
-                            }
-                          }}
+                          className={`phase-cell ${isCurrentCell ? "phase-cell-current" : ""}`}
+                          style={{ backgroundColor: isCurrentCell ? "#fbbf24" : point.color }}
                         >
                           {isCurrentCell && (
                             <span style={{ 
@@ -981,6 +957,17 @@ export default function EdgeOfChaosExplorer() {
                               textShadow: "0 0 4px rgba(255,255,255,0.5)"
                             }}>●</span>
                           )}
+                          <div className="phase-tooltip">
+                            <div className="phase-tooltip-regime" style={{ color: point.color }}>
+                              {point.regime}
+                            </div>
+                            <div className="phase-tooltip-params">
+                              α = {point.alpha.toFixed(1)}, λ = {point.lambda.toFixed(1)}
+                            </div>
+                            <div className="phase-tooltip-metrics">
+                              MI: {point.mi.toFixed(3)} bits · Gini: {point.gini.toFixed(3)}
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
