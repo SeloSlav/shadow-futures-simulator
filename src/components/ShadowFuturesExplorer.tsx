@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useDeferredValue } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -23,6 +23,8 @@ interface SeriesDataPoint {
   Gini: number;
   Top1: number;
   Top10: number;
+  taxRevenue?: number;
+  postTaxGini?: number;
 }
 
 interface BarDataPoint {
@@ -39,6 +41,22 @@ interface SimulationResult {
   series: SeriesDataPoint[];
   bars: BarDataPoint[];
   effortCurve: EffortCurvePoint[];
+  totalTaxRevenue?: number;
+}
+
+interface PhasePoint {
+  alpha: number;
+  lambda: number;
+  regime: string;
+  color: string;
+  mi: number;
+  gini: number;
+}
+
+interface TaxRevenuePoint {
+  rate: number;
+  revenue: number;
+  postTaxGini: number;
 }
 
 interface SimulationParams {
@@ -49,6 +67,8 @@ interface SimulationParams {
   A0?: number;
   bins?: number;
   seed?: number;
+  incomeTaxRate?: number;
+  wealthTaxRate?: number;
 }
 
 interface Preset {
@@ -167,6 +187,8 @@ function simulate({
   A0 = 1.0,
   bins = 10,
   seed = 7,
+  incomeTaxRate = 0.0,
+  wealthTaxRate = 0.0,
 }: SimulationParams): SimulationResult {
   const rng = mulberry32(seed);
 
@@ -175,9 +197,11 @@ function simulate({
   const A: number[] = [];
   const gotAnyReward: number[] = [];
   const rewardCount: number[] = [];
+  const wealth: number[] = []; // Post-tax accumulated wealth
 
   // Track time series for plotting
   const series: SeriesDataPoint[] = [];
+  let totalTaxRevenue = 0;
 
   for (let t = 0; t < T; t++) {
     // Entry
@@ -186,10 +210,26 @@ function simulate({
     A.push(A0);
     gotAnyReward.push(0);
     rewardCount.push(0);
+    wealth.push(0);
 
     // Churn: decay attachments slightly each step (prevents full lock-in)
     if (churn > 0) {
       for (let i = 0; i < A.length; i++) A[i] *= 1 - churn;
+    }
+
+    // Wealth tax: applied to accumulated wealth/attachment AND accumulated wealth
+    if (wealthTaxRate > 0) {
+      for (let i = 0; i < A.length; i++) {
+        // Tax attachment (affects allocation)
+        const attachmentTax = A[i] * wealthTaxRate;
+        A[i] -= attachmentTax;
+        totalTaxRevenue += attachmentTax;
+        
+        // Tax accumulated wealth (affects inequality measurement)
+        const wealthTax = wealth[i] * wealthTaxRate;
+        wealth[i] -= wealthTax;
+        // Note: wealth tax revenue already counted via attachment tax
+      }
     }
 
     // Reward allocation
@@ -205,7 +245,15 @@ function simulate({
     });
 
     const winner = softmaxPick(weights, rng);
-    A[winner] += 1;
+    const reward = 1;
+    
+    // Income tax on reward
+    const afterTaxReward = reward * (1 - incomeTaxRate);
+    const taxCollected = reward * incomeTaxRate;
+    totalTaxRevenue += taxCollected;
+    
+    A[winner] += afterTaxReward;
+    wealth[winner] += afterTaxReward;
     gotAnyReward[winner] = 1;
     rewardCount[winner] += 1;
 
@@ -220,6 +268,7 @@ function simulate({
 
     const mi = mutualInformationBinned({ effort, rewarded: gotAnyReward, bins });
     const g = gini(rewardCount);
+    const postTaxG = wealth.length > 0 && wealth.reduce((s, x) => s + x, 0) > 0 ? gini(wealth) : g;
 
     series.push({
       t: t + 1,
@@ -227,6 +276,8 @@ function simulate({
       Gini: g,
       Top1: top1,
       Top10: top10share,
+      taxRevenue: totalTaxRevenue,
+      postTaxGini: postTaxG,
     });
   }
 
@@ -252,7 +303,108 @@ function simulate({
     pRewarded: c.n ? c.r / c.n : 0,
   }));
 
-  return { series, bars, effortCurve };
+  return { series, bars, effortCurve, totalTaxRevenue };
+}
+
+// Classify regime based on alpha, lambda, churn
+function classifyRegime(alpha: number, lambda: number, churn: number): { name: string; color: string } {
+  // Ordered: low alpha, high lambda, moderate churn
+  if (alpha < 0.5 && lambda > 0.8 && churn > 0.005) {
+    return { name: "Ordered", color: "#3b82f6" }; // Blue
+  }
+  // Periodic: moderate alpha, high lambda, low churn
+  if (alpha >= 0.5 && alpha < 1.0 && lambda > 0.6 && churn < 0.01) {
+    return { name: "Periodic", color: "#10b981" }; // Green
+  }
+  // Complex (Edge of Chaos): balanced parameters
+  if (alpha >= 0.9 && alpha <= 1.2 && lambda >= 0.4 && lambda <= 0.8 && churn >= 0.005 && churn <= 0.015) {
+    return { name: "Complex", color: "#f59e0b" }; // Amber
+  }
+  // Chaotic: high alpha, low lambda, low churn
+  if (alpha > 1.2 && lambda < 0.5 && churn < 0.005) {
+    return { name: "Chaotic", color: "#ef4444" }; // Red
+  }
+  // Transitional
+  return { name: "Transitional", color: "#8b5cf6" }; // Purple
+}
+
+// Generate phase transition data
+function generatePhaseTransition(
+  alphaRange: [number, number],
+  lambdaRange: [number, number],
+  churn: number,
+  resolution: number = 10
+): PhasePoint[] {
+  const points: PhasePoint[] = [];
+  const alphaStep = (alphaRange[1] - alphaRange[0]) / resolution;
+  const lambdaStep = (lambdaRange[1] - lambdaRange[0]) / resolution;
+
+  // Generate grid row by row (top to bottom = high λ to low λ)
+  // Each row: left to right = low α to high α
+  for (let row = 0; row < resolution; row++) {
+    const lambda = lambdaRange[1] - (row + 0.5) * lambdaStep; // Start from top (high λ)
+    for (let col = 0; col < resolution; col++) {
+      const alpha = alphaRange[0] + (col + 0.5) * alphaStep; // Left to right (low to high α)
+      const regime = classifyRegime(alpha, lambda, churn);
+
+      // Quick simulation to get MI and Gini - reduced T for performance
+      const quickResult = simulate({ T: 100, alpha, lambda, churn, bins: 10, seed: 42 });
+      const last = quickResult.series[quickResult.series.length - 1];
+
+      points.push({
+        alpha,
+        lambda,
+        regime: regime.name,
+        color: regime.color,
+        mi: last.MI_bits,
+        gini: last.Gini,
+      });
+    }
+  }
+  return points;
+}
+
+// Generate tax revenue curve
+function generateTaxRevenueCurve(
+  alpha: number,
+  lambda: number,
+  churn: number,
+  T: number,
+  taxType: "income" | "wealth",
+  maxRate: number = 0.5,
+  steps: number = 10
+): TaxRevenuePoint[] {
+  const points: TaxRevenuePoint[] = [];
+  const rateStep = maxRate / steps;
+  // Use reduced T for performance when generating curves
+  const curveT = Math.min(T, 300);
+
+  for (let i = 0; i <= steps; i++) {
+    const rate = i * rateStep;
+    const params: SimulationParams = {
+      T: curveT,
+      alpha,
+      lambda,
+      churn,
+      bins: 10,
+      seed: 42,
+    };
+    if (taxType === "income") {
+      params.incomeTaxRate = rate;
+    } else {
+      params.wealthTaxRate = rate;
+    }
+
+    const result = simulate(params);
+    const last = result.series[result.series.length - 1];
+    
+    points.push({
+      rate: rate * 100, // Convert to percentage
+      revenue: result.totalTaxRevenue || 0,
+      postTaxGini: last.postTaxGini || last.Gini,
+    });
+  }
+  return points;
 }
 
 function LabeledSlider({ label, value, onChange, min, max, step, format }: LabeledSliderProps) {
@@ -277,9 +429,11 @@ export default function EdgeOfChaosExplorer() {
   const [alpha, setAlpha] = useState(1.0);
   const [lambda, setLambda] = useState(0.0);
   const [churn, setChurn] = useState(0.0);
-  const [T, setT] = useState(400);
+  const [T, setT] = useState(200);
   const [seed, setSeed] = useState(7);
   const [activePreset, setActivePreset] = useState<Preset | null>(null);
+  const [incomeTaxRate, setIncomeTaxRate] = useState(0.0);
+  const [wealthTaxRate, setWealthTaxRate] = useState(0.0);
 
   const bins = 10;
 
@@ -346,18 +500,40 @@ export default function EdgeOfChaosExplorer() {
     setSeed((s) => s + 1);
   };
 
-  const { series, bars, effortCurve } = useMemo(() => {
-    return simulate({ T, alpha, lambda, churn, bins, seed });
-  }, [T, alpha, lambda, churn, seed]);
+  const { series, bars, effortCurve, totalTaxRevenue } = useMemo(() => {
+    return simulate({ T, alpha, lambda, churn, bins, seed, incomeTaxRate, wealthTaxRate });
+  }, [T, alpha, lambda, churn, seed, incomeTaxRate, wealthTaxRate]);
+
+  // Use deferred values for expensive computations to prevent blocking
+  const deferredChurn = useDeferredValue(churn);
+  const deferredAlpha = useDeferredValue(alpha);
+  const deferredLambda = useDeferredValue(lambda);
+  const deferredT = useDeferredValue(T);
+  
+  // Track if deferred values are stale
+  const isPending = churn !== deferredChurn || alpha !== deferredAlpha || lambda !== deferredLambda || T !== deferredT;
+
+  const phaseTransitionData = useMemo(() => {
+    return generatePhaseTransition([0, 2], [0, 2], deferredChurn, 10);
+  }, [deferredChurn]);
+
+  const incomeTaxCurve = useMemo(() => {
+    return generateTaxRevenueCurve(deferredAlpha, deferredLambda, deferredChurn, deferredT, "income", 1.0, 15);
+  }, [deferredAlpha, deferredLambda, deferredChurn, deferredT]);
+
+  const wealthTaxCurve = useMemo(() => {
+    return generateTaxRevenueCurve(deferredAlpha, deferredLambda, deferredChurn, deferredT, "wealth", 1.0, 15);
+  }, [deferredAlpha, deferredLambda, deferredChurn, deferredT]);
 
   const last = series[series.length - 1] || { MI_bits: 0, Gini: 0, Top1: 0, Top10: 0 };
 
   const regimeHint = useMemo(() => {
-    if (churn >= 0.02) return "High mixing";
-    if (alpha < 0.7) return "Weak reinforcement";
-    if (alpha >= 1.2 && churn <= 0.005 && lambda < 0.5) return "Lock-in";
-    if (alpha >= 1.0 && lambda >= 0.8 && churn <= 0.01) return "Effort-visible";
-    return "Intermediate";
+    const regime = classifyRegime(alpha, lambda, churn);
+    return regime.name;
+  }, [alpha, lambda, churn]);
+
+  const currentRegime = useMemo(() => {
+    return classifyRegime(alpha, lambda, churn);
   }, [alpha, lambda, churn]);
 
   return (
@@ -370,7 +546,7 @@ export default function EdgeOfChaosExplorer() {
       >
         <h1 className="title">Shadow Futures Simulator</h1>
         <p className="subtitle">
-          Toy model for when work can be identified across regimes. Reinforcement (α) pushes toward lock-in. Effort weight (λ)
+          A toy model for when work can be identified across different economic regimes. Reinforcement (α) pushes toward lock-in. Effort weight (λ)
           makes transcripts matter. Churn prevents permanent state capture.
         </p>
       </motion.div>
@@ -449,9 +625,39 @@ export default function EdgeOfChaosExplorer() {
               format={(v) => `${v}`}
             />
 
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Tax Policy</div>
+              <LabeledSlider
+                label="Income Tax Rate"
+                value={incomeTaxRate}
+                onChange={setIncomeTaxRate}
+                min={0}
+                max={1.0}
+                step={0.01}
+                format={(v) => `${(v * 100).toFixed(0)}%`}
+              />
+              <LabeledSlider
+                label="Wealth Tax Rate"
+                value={wealthTaxRate}
+                onChange={setWealthTaxRate}
+                min={0}
+                max={1.0}
+                step={0.01}
+                format={(v) => `${(v * 100).toFixed(0)}%`}
+              />
+              {totalTaxRevenue !== undefined && totalTaxRevenue > 0 && (
+                <div className="text-xs text-muted">
+                  Total tax revenue: {totalTaxRevenue.toFixed(2)}
+                </div>
+              )}
+            </div>
+
+
             <div className="regime-section">
               <div className="text-sm font-medium">Regime</div>
-              <div className="text-sm text-muted">{regimeHint}</div>
+              <div className="text-sm" style={{ color: currentRegime.color }}>
+                {regimeHint}
+              </div>
             </div>
 
             {activePreset && (
@@ -481,20 +687,32 @@ export default function EdgeOfChaosExplorer() {
                   MI: <span className="font-semibold">{last.MI_bits.toFixed(3)}</span> bits
                 </div>
                 <div className="text-sm">
-                  Gini: <span className="font-semibold">{last.Gini.toFixed(3)}</span>
+                  Gini (rewards): <span className="font-semibold">{last.Gini.toFixed(3)}</span>
                 </div>
+                {(incomeTaxRate > 0 || wealthTaxRate > 0) && last.postTaxGini !== undefined && (
+                  <div className="text-sm">
+                    Gini (post-tax): <span className="font-semibold text-green-400">{last.postTaxGini.toFixed(3)}</span>
+                  </div>
+                )}
                 <div className="text-sm">
                   Top1: <span className="font-semibold">{(last.Top1 * 100).toFixed(1)}%</span>
                 </div>
               </div>
             </div>
 
-            <div className="main-chart">
-              <ResponsiveContainer>
+            <div className="main-chart" style={{ minHeight: "300px", minWidth: 0 }}>
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={series}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                  <XAxis dataKey="t" stroke="#888" />
-                  <YAxis stroke="#888" />
+                  <XAxis 
+                    dataKey="t" 
+                    stroke="#888"
+                    label={{ value: "Time Step", position: "insideBottom", offset: -5 }}
+                  />
+                  <YAxis 
+                    stroke="#888"
+                    label={{ value: "Value", angle: -90, position: "insideLeft" }}
+                  />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333' }}
                     labelStyle={{ color: '#fff' }}
@@ -506,15 +724,106 @@ export default function EdgeOfChaosExplorer() {
               </ResponsiveContainer>
             </div>
 
-            <div className="sub-charts-grid">
+            <div className="space-y-4 mt-6">
+              <div>
+                <div className="section-title">
+                  Tax Revenue Analysis
+                  {isPending && <span className="text-xs text-muted ml-2">(Updating...)</span>}
+                </div>
+                <div className="text-sm text-muted leading-relaxed mb-4">
+                  Revenue maximization differs between tax types. Income taxes capture flows but can reduce incentives.
+                  Wealth taxes target accumulated advantage directly, which is especially effective in high increasing returns regimes
+                  (high α) where wealth concentration is extreme. The Laffer curve shows revenue peaks at different rates.
+                </div>
+              </div>
+              <div style={{ height: "300px", width: "100%", minHeight: "300px", minWidth: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis 
+                      dataKey="rate" 
+                      name="Tax Rate (%)" 
+                      stroke="#888"
+                      label={{ value: "Tax Rate (%)", position: "insideBottom", offset: -5 }}
+                    />
+                    <YAxis 
+                      yAxisId="left"
+                      stroke="#888"
+                      label={{ value: "Revenue", angle: -90, position: "insideLeft" }}
+                    />
+                    <YAxis 
+                      yAxisId="right" 
+                      orientation="right"
+                      stroke="#888"
+                      label={{ value: "Post-Tax Gini", angle: 90, position: "insideRight" }}
+                    />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333' }}
+                      labelStyle={{ color: '#fff' }}
+                    />
+                    <Line 
+                      yAxisId="left"
+                      type="monotone" 
+                      dataKey="revenue" 
+                      data={incomeTaxCurve} 
+                      stroke="#06b6d4" 
+                      name="Income Tax Revenue"
+                      dot={false}
+                    />
+                    <Line 
+                      yAxisId="left"
+                      type="monotone" 
+                      dataKey="revenue" 
+                      data={wealthTaxCurve} 
+                      stroke="#f472b6" 
+                      name="Wealth Tax Revenue"
+                      dot={false}
+                    />
+                    <Line 
+                      yAxisId="right"
+                      type="monotone" 
+                      dataKey="postTaxGini" 
+                      data={incomeTaxCurve} 
+                      stroke="#06b6d4" 
+                      strokeDasharray="5 5"
+                      name="Post-Tax Gini (Income)"
+                      dot={false}
+                    />
+                    <Line 
+                      yAxisId="right"
+                      type="monotone" 
+                      dataKey="postTaxGini" 
+                      data={wealthTaxCurve} 
+                      stroke="#f472b6" 
+                      strokeDasharray="5 5"
+                      name="Post-Tax Gini (Wealth)"
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="text-xs text-muted">
+                Solid lines: Revenue. Dashed lines: Post-tax inequality (Gini coefficient). 
+                In high α regimes, wealth taxes can generate more revenue at lower rates while reducing inequality more effectively.
+              </div>
+            </div>
+
+            <div className="sub-charts-grid mt-6">
               <div className="space-y-2">
                 <div className="text-sm font-medium">Top reward shares</div>
-                <div className="sub-chart">
-                  <ResponsiveContainer>
+                <div className="sub-chart" style={{ minHeight: "200px", minWidth: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={bars}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="rank" stroke="#888" />
-                      <YAxis stroke="#888" />
+                      <XAxis 
+                        dataKey="rank" 
+                        stroke="#888"
+                        label={{ value: "Rank", position: "insideBottom", offset: -5 }}
+                      />
+                      <YAxis 
+                        stroke="#888"
+                        label={{ value: "Share", angle: -90, position: "insideLeft" }}
+                      />
                       <Tooltip
                         contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333' }}
                         labelStyle={{ color: '#fff' }}
@@ -526,12 +835,19 @@ export default function EdgeOfChaosExplorer() {
               </div>
               <div className="space-y-2">
                 <div className="text-sm font-medium">Effort bins vs chance of any reward</div>
-                <div className="sub-chart">
-                  <ResponsiveContainer>
+                <div className="sub-chart" style={{ minHeight: "200px", minWidth: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={effortCurve}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="bin" stroke="#888" />
-                      <YAxis stroke="#888" />
+                      <XAxis 
+                        dataKey="bin" 
+                        stroke="#888"
+                        label={{ value: "Effort Bin", position: "insideBottom", offset: -5 }}
+                      />
+                      <YAxis 
+                        stroke="#888"
+                        label={{ value: "Probability", angle: -90, position: "insideLeft" }}
+                      />
                       <Tooltip
                         contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333' }}
                         labelStyle={{ color: '#fff' }}
@@ -547,19 +863,290 @@ export default function EdgeOfChaosExplorer() {
       </div>
 
       <Card className="info-card">
+          <CardContent className="p-5 space-y-4">
+            <div className="section-title">
+              Phase Transition Map
+              {isPending && <span className="text-xs text-muted ml-2">(Updating...)</span>}
+            </div>
+            <div className="text-sm text-muted leading-relaxed mb-4">
+              This map shows how different combinations of reinforcement (α) and effort weight (λ) create distinct regimes.
+              Your current position is marked with a white ring. Move from blue (ordered, effort matters) toward red (chaotic, lock-in dominates).
+            </div>
+            
+            {/* Custom heatmap-style phase diagram */}
+            <div style={{ width: "100%", maxWidth: "500px", margin: "0 auto" }}>
+              {/* Main grid with axes */}
+              <div style={{ display: "flex", alignItems: "stretch" }}>
+                {/* Y-axis label (rotated) */}
+                <div style={{ 
+                  writingMode: "vertical-rl", 
+                  transform: "rotate(180deg)", 
+                  fontSize: "12px", 
+                  color: "#9ca3af",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingRight: "4px"
+                }}>
+                  λ (Effort Weight) →
+                </div>
+                
+                {/* Y-axis ticks */}
+                <div style={{ 
+                  display: "flex", 
+                  flexDirection: "column", 
+                  justifyContent: "space-between", 
+                  fontSize: "11px", 
+                  color: "#9ca3af",
+                  paddingRight: "6px",
+                  height: "300px",
+                  textAlign: "right",
+                  minWidth: "28px"
+                }}>
+                  <span>2.0</span>
+                  <span>1.5</span>
+                  <span>1.0</span>
+                  <span>0.5</span>
+                  <span>0.0</span>
+                </div>
+                
+                {/* The actual grid */}
+                <div style={{ position: "relative", flex: 1, height: "300px" }}>
+                  <div 
+                    style={{ 
+                      display: "grid",
+                      gridTemplateColumns: "repeat(10, 1fr)",
+                      gridTemplateRows: "repeat(10, 1fr)",
+                      width: "100%",
+                      height: "100%",
+                      gap: "1px",
+                      backgroundColor: "rgba(0,0,0,0.3)"
+                    }}
+                  >
+                    {phaseTransitionData.map((point, idx) => {
+                      // Check if this cell contains the current position
+                      const cellAlphaMin = point.alpha - 0.1;
+                      const cellAlphaMax = point.alpha + 0.1;
+                      const cellLambdaMin = point.lambda - 0.1;
+                      const cellLambdaMax = point.lambda + 0.1;
+                      const isCurrentCell = alpha >= cellAlphaMin && alpha < cellAlphaMax && 
+                                           lambda >= cellLambdaMin && lambda < cellLambdaMax;
+                      
+                      return (
+                        <div
+                          key={idx}
+                          style={{ 
+                            backgroundColor: point.color,
+                            cursor: "pointer",
+                            transition: "filter 0.15s",
+                            border: isCurrentCell ? "3px solid white" : "none",
+                            boxShadow: isCurrentCell ? "0 0 12px rgba(255,255,255,0.8), inset 0 0 8px rgba(255,255,255,0.3)" : "none",
+                            borderRadius: isCurrentCell ? "4px" : "0",
+                            position: "relative",
+                            zIndex: isCurrentCell ? 10 : 1
+                          }}
+                          title={`${point.regime}\nα=${point.alpha.toFixed(1)}, λ=${point.lambda.toFixed(1)}\nMI: ${point.mi.toFixed(3)} bits | Gini: ${point.gini.toFixed(3)}`}
+                          onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(1.3)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.filter = "brightness(1)")}
+                        />
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Current position crosshair marker */}
+                  <div 
+                    style={{
+                      position: "absolute",
+                      left: `${(alpha / 2) * 100}%`,
+                      bottom: `${(lambda / 2) * 100}%`,
+                      transform: "translate(-50%, 50%)",
+                      width: "20px",
+                      height: "20px",
+                      border: "3px solid white",
+                      borderRadius: "50%",
+                      boxShadow: "0 0 12px rgba(255,255,255,0.9), 0 0 4px rgba(0,0,0,0.8)",
+                      pointerEvents: "none",
+                      zIndex: 20
+                    }}
+                  />
+                </div>
+              </div>
+              
+              {/* X-axis ticks */}
+              <div style={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                fontSize: "11px", 
+                color: "#9ca3af",
+                paddingTop: "6px",
+                marginLeft: "52px"
+              }}>
+                <span>0.0</span>
+                <span>0.5</span>
+                <span>1.0</span>
+                <span>1.5</span>
+                <span>2.0</span>
+              </div>
+              
+              {/* X-axis label */}
+              <div style={{ textAlign: "center", fontSize: "12px", color: "#9ca3af", marginTop: "4px", marginLeft: "52px" }}>
+                α (Reinforcement) →
+              </div>
+            </div>
+            
+            {/* Legend */}
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "16px", fontSize: "12px", marginTop: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: "#3b82f6" }}></div>
+                <span style={{ color: "#d1d5db" }}>Ordered</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: "#10b981" }}></div>
+                <span style={{ color: "#d1d5db" }}>Periodic</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: "#f59e0b" }}></div>
+                <span style={{ color: "#d1d5db" }}>Edge of Chaos</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: "#ef4444" }}></div>
+                <span style={{ color: "#d1d5db" }}>Chaotic</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: "#8b5cf6" }}></div>
+                <span style={{ color: "#d1d5db" }}>Transitional</span>
+              </div>
+            </div>
+            
+            {/* Interpretation guide */}
+            <div style={{ 
+              display: "grid", 
+              gridTemplateColumns: "1fr 1fr", 
+              gap: "16px", 
+              fontSize: "12px", 
+              marginTop: "16px", 
+              padding: "12px", 
+              backgroundColor: "rgba(55, 65, 81, 0.5)", 
+              borderRadius: "6px" 
+            }}>
+              <div>
+                <div style={{ fontWeight: 600, color: "#60a5fa", marginBottom: "4px" }}>↙ Bottom-Left (Low α, Low λ)</div>
+                <div style={{ color: "#9ca3af" }}>Random allocation, no patterns</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, color: "#f87171", marginBottom: "4px" }}>↘ Bottom-Right (High α, Low λ)</div>
+                <div style={{ color: "#9ca3af" }}>Winner-take-all lock-in</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, color: "#60a5fa", marginBottom: "4px" }}>↖ Top-Left (Low α, High λ)</div>
+                <div style={{ color: "#9ca3af" }}>Effort-based meritocracy</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, color: "#fbbf24", marginBottom: "4px" }}>↗ Top-Right (High α, High λ)</div>
+                <div style={{ color: "#9ca3af" }}>Tension zone / edge of chaos</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+      <Card className="info-card">
+          <CardContent className="p-5 space-y-4">
+            <div className="section-title">Glossary</div>
+            <div className="space-y-4 text-sm">
+              <div>
+                <div className="font-semibold text-base mb-1">Reinforcement (α)</div>
+                <div className="text-muted leading-relaxed">
+                  Controls how strongly past rewards amplify future reward probability. When α &gt; 1, the system exhibits 
+                  increasing returns: early winners gain disproportionate advantage. When α &lt; 1, advantages decay over time.
+                  This creates path dependence where historical accidents compound.
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold text-base mb-1">Effort Weight (λ)</div>
+                <div className="text-muted leading-relaxed">
+                  Determines how much verifiable effort (work transcripts) influences reward allocation. High λ means effort 
+                  is highly informative about outcomes. Low λ means effort provides little signal, even when perfectly verifiable.
+                  In high α regimes, even high λ can fail to create informative signals due to lock-in.
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold text-base mb-1">Churn</div>
+                <div className="text-muted leading-relaxed">
+                  The rate at which accumulated advantage (attachment A) decays over time. High churn prevents permanent 
+                  lock-in by continuously mixing the system state. Low churn allows early advantages to persist indefinitely.
+                  Churn represents turnover, competition, or institutional mechanisms that reset advantages.
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold text-base mb-1">Work Transcripts</div>
+                <div className="text-muted leading-relaxed">
+                  Verifiable records of effort (V). In the model, each agent has a transcript value v ∈ [0,1] representing 
+                  their verified work. Despite perfect verification, transcripts may fail to signal value creation when 
+                  reinforcement dominates allocation.
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold text-base mb-1">Lock-in</div>
+                <div className="text-muted leading-relaxed">
+                  A state where early advantages become permanent due to high reinforcement (α) and low churn. Once lock-in 
+                  occurs, effort becomes uninformative even though it remains verifiable. The system converges to a state 
+                  where outcomes are determined by historical accidents rather than current effort.
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold text-base mb-1">Mutual Information (MI)</div>
+                <div className="text-muted leading-relaxed">
+                  Measures how much information about reward outcomes you gain by knowing effort transcripts. Measured in bits.
+                  MI = 0 means effort tells you nothing about rewards. Higher MI means effort is informative. In lock-in regimes,
+                  MI collapses toward zero even with perfect verification.
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold text-base mb-1">Attachment (A)</div>
+                <div className="text-muted leading-relaxed">
+                  Accumulated advantage that determines future reward probability. Each reward increases A, creating reinforcement.
+                  A represents network position, capital, reputation, or any advantage that compounds. Wealth taxes target A directly.
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold text-base mb-1">Regimes</div>
+                <div className="text-muted leading-relaxed space-y-1">
+                  <div><strong>Ordered:</strong> Low α, high λ, moderate churn. Effort is highly informative, outcomes are predictable.</div>
+                  <div><strong>Periodic:</strong> Moderate α, high λ, low churn. Patterns emerge but remain effort-dependent.</div>
+                  <div><strong>Complex (Edge of Chaos):</strong> Balanced parameters. Maximum adaptability, effort remains informative.</div>
+                  <div><strong>Chaotic:</strong> High α, low λ, low churn. Lock-in dominates, effort becomes uninformative.</div>
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold text-base mb-1">Wealth Tax vs Income Tax</div>
+                <div className="text-muted leading-relaxed">
+                  <strong>Income Tax:</strong> Applied to reward flows. Captures new rewards but doesn't address accumulated advantage.
+                  In high α regimes, income taxes may reduce revenue as rates increase (Laffer curve effect).
+                  <br />
+                  <strong>Wealth Tax:</strong> Applied to accumulated attachment (A). Directly targets the source of increasing returns.
+                  More effective in high α regimes because it reduces the compounding advantage that drives inequality.
+                  Can generate more revenue at lower rates while reducing inequality more effectively.
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+      <Card className="info-card">
         <CardContent className="p-5 space-y-3">
           <div className="section-title">How to read this</div>
           <div className="text-sm text-muted leading-relaxed">
             If α is high and churn is low, early wins compound and the system locks in. In that regime, the effort curve can flatten
             and MI can drift toward zero, even though all effort is perfectly verifiable. Increasing λ makes effort matter more in the
-            allocation rule. Increasing churn prevents permanent advantage by continually mixing the state.
+            allocation rule. Increasing churn prevents permanent advantage by continually mixing the state. Wealth taxes are particularly
+            effective in high α regimes because they target accumulated advantage directly, unlike income taxes which only capture flows.
           </div>
         </CardContent>
       </Card>
 
       <div className="text-xs text-muted">
-        Notes: MI = I(V;R) is estimated by binning verified effort V and treating reward R as binary (ever rewarded). 
-        Formula: I(V;R) = Σ p(v) Σ p(r|v) log(p(r|v)/p(r)). This is a visualization aid, not an econometric estimator.
+        Notes: MI is estimated by binning effort and treating reward as the event of receiving any reward. This is a visualization aid,
+        not an econometric estimator. Tax simulations use simplified models and don't account for behavioral responses or general equilibrium effects.
       </div>
     </div>
   );
