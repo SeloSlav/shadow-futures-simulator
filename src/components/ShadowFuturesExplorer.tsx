@@ -58,6 +58,7 @@ interface TaxRevenuePoint {
   rate: number;
   revenue: number;
   postTaxGini: number;
+  mi: number; // Mutual Information - how informative is effort?
 }
 
 interface SimulationParams {
@@ -246,7 +247,16 @@ function simulate({
     });
 
     const winner = softmaxPick(weights, rng);
-    const reward = 1;
+    
+    // Economic efficiency: high taxes reduce output (behavioral response)
+    // This creates a Laffer curve effect - at very high taxes, less value is created
+    // Using 1/(1 + elasticity*rate) model for smooth decay
+    const taxElasticity = 0.8; // How sensitive economy is to taxation
+    const incomeEfficiency = 1 / (1 + taxElasticity * incomeTaxRate);
+    const wealthEfficiency = 1 / (1 + taxElasticity * wealthTaxRate * 0.5); // Wealth tax has less direct effect on output
+    const economicOutput = incomeEfficiency * wealthEfficiency;
+    
+    const reward = economicOutput; // Base reward adjusted by economic efficiency
     
     // Income tax on reward
     const afterTaxReward = reward * (1 - incomeTaxRate);
@@ -399,12 +409,11 @@ function generateTaxRevenueCurve(
     const result = simulate(params);
     const last = result.series[result.series.length - 1];
     
-    // Use Gini of reward distribution (who won how many times), not instantaneous wealth
-    // This measures fairness of allocation over time, which is what taxes actually affect
     points.push({
       rate: rate * 100, // Convert to percentage
       revenue: result.totalTaxRevenue || 0,
       postTaxGini: last.Gini, // Reward distribution concentration
+      mi: last.MI_bits, // How informative is effort about reward?
     });
   }
   return points;
@@ -528,17 +537,22 @@ export default function EdgeOfChaosExplorer() {
     return generateTaxRevenueCurve(deferredAlpha, deferredLambda, deferredChurn, deferredT, "wealth", 1.0, 15);
   }, [deferredAlpha, deferredLambda, deferredChurn, deferredT]);
 
-  // Find optimal tax rates (max revenue and min concentration)
+  // Find optimal tax rates - focus on peak revenue AND peak MI (effort informativeness)
   const optimalIncomeTax = useMemo(() => {
     if (incomeTaxCurve.length === 0) return null;
     const maxRevenue = incomeTaxCurve.reduce((max, point) => point.revenue > max.revenue ? point : max, incomeTaxCurve[0]);
-    const minGini = incomeTaxCurve.reduce((min, point) => point.postTaxGini < min.postTaxGini ? point : min, incomeTaxCurve[0]);
+    const maxMI = incomeTaxCurve.reduce((max, point) => point.mi > max.mi ? point : max, incomeTaxCurve[0]);
+    const baseMI = incomeTaxCurve[0]?.mi || 0;
     const baseGini = incomeTaxCurve[0]?.postTaxGini || 0;
     return { 
-      peakRevenueRate: maxRevenue.rate, 
+      peakRevenueRate: maxRevenue.rate,
       peakRevenue: maxRevenue.revenue,
-      minGiniRate: minGini.rate,
-      minGini: minGini.postTaxGini,
+      giniAtPeakRevenue: maxRevenue.postTaxGini,
+      peakMIRate: maxMI.rate,
+      peakMI: maxMI.mi,
+      giniAtPeakMI: maxMI.postTaxGini,
+      revenueAtPeakMI: maxMI.revenue,
+      baseMI,
       baseGini
     };
   }, [incomeTaxCurve]);
@@ -546,13 +560,18 @@ export default function EdgeOfChaosExplorer() {
   const optimalWealthTax = useMemo(() => {
     if (wealthTaxCurve.length === 0) return null;
     const maxRevenue = wealthTaxCurve.reduce((max, point) => point.revenue > max.revenue ? point : max, wealthTaxCurve[0]);
-    const minGini = wealthTaxCurve.reduce((min, point) => point.postTaxGini < min.postTaxGini ? point : min, wealthTaxCurve[0]);
+    const maxMI = wealthTaxCurve.reduce((max, point) => point.mi > max.mi ? point : max, wealthTaxCurve[0]);
+    const baseMI = wealthTaxCurve[0]?.mi || 0;
     const baseGini = wealthTaxCurve[0]?.postTaxGini || 0;
     return { 
-      peakRevenueRate: maxRevenue.rate, 
+      peakRevenueRate: maxRevenue.rate,
       peakRevenue: maxRevenue.revenue,
-      minGiniRate: minGini.rate,
-      minGini: minGini.postTaxGini,
+      giniAtPeakRevenue: maxRevenue.postTaxGini,
+      peakMIRate: maxMI.rate,
+      peakMI: maxMI.mi,
+      giniAtPeakMI: maxMI.postTaxGini,
+      revenueAtPeakMI: maxMI.revenue,
+      baseMI,
       baseGini
     };
   }, [wealthTaxCurve]);
@@ -873,7 +892,7 @@ export default function EdgeOfChaosExplorer() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-              {/* Optimal rates summary */}
+              {/* Optimal rates summary - reframed around paper's goals */}
               <div style={{ 
                 display: "grid", 
                 gridTemplateColumns: "1fr 1fr", 
@@ -884,32 +903,45 @@ export default function EdgeOfChaosExplorer() {
                 borderRadius: "8px"
               }}>
                 <div style={{ padding: "10px", backgroundColor: "rgba(6, 182, 212, 0.1)", borderRadius: "6px", borderLeft: "3px solid #06b6d4" }}>
-                  <div style={{ fontSize: "12px", color: "#06b6d4", fontWeight: 600, marginBottom: "6px" }}>Income Tax (cyan)</div>
-                  <div style={{ fontSize: "12px", color: "#e5e7eb", marginBottom: "4px" }}>
-                    Peak revenue: <strong>{optimalIncomeTax?.peakRevenueRate.toFixed(0)}%</strong>
+                  <div style={{ fontSize: "12px", color: "#06b6d4", fontWeight: 600, marginBottom: "8px" }}>Income Tax (cyan)</div>
+                  <div style={{ fontSize: "12px", color: "#e5e7eb", marginBottom: "6px" }}>
+                    <strong>Peak revenue:</strong> {optimalIncomeTax?.peakRevenueRate.toFixed(0)}% 
+                    <span style={{ color: "#9ca3af", marginLeft: "4px" }}>
+                      (conc: {optimalIncomeTax?.giniAtPeakRevenue.toFixed(2)})
+                    </span>
                   </div>
                   <div style={{ fontSize: "12px", color: "#e5e7eb", marginBottom: "4px" }}>
-                    Min concentration: <strong>{optimalIncomeTax?.minGiniRate.toFixed(0)}%</strong> → {optimalIncomeTax?.minGini.toFixed(2)}
+                    <strong>Peak effort signal:</strong> {optimalIncomeTax?.peakMIRate.toFixed(0)}%
+                    <span style={{ color: "#06b6d4", marginLeft: "4px" }}>
+                      (MI: {optimalIncomeTax?.peakMI.toFixed(3)} bits)
+                    </span>
                   </div>
                   <div style={{ fontSize: "11px", color: "#9ca3af" }}>
-                    (baseline: {optimalIncomeTax?.baseGini.toFixed(2)})
+                    Baseline MI: {optimalIncomeTax?.baseMI.toFixed(3)} bits
                   </div>
                 </div>
                 <div style={{ padding: "10px", backgroundColor: "rgba(244, 114, 182, 0.1)", borderRadius: "6px", borderLeft: "3px solid #f472b6" }}>
-                  <div style={{ fontSize: "12px", color: "#f472b6", fontWeight: 600, marginBottom: "6px" }}>Wealth Tax (pink)</div>
-                  <div style={{ fontSize: "12px", color: "#e5e7eb", marginBottom: "4px" }}>
-                    Peak revenue: <strong>{optimalWealthTax?.peakRevenueRate.toFixed(0)}%</strong>
+                  <div style={{ fontSize: "12px", color: "#f472b6", fontWeight: 600, marginBottom: "8px" }}>Wealth Tax (pink)</div>
+                  <div style={{ fontSize: "12px", color: "#e5e7eb", marginBottom: "6px" }}>
+                    <strong>Peak revenue:</strong> {optimalWealthTax?.peakRevenueRate.toFixed(0)}%
+                    <span style={{ color: "#9ca3af", marginLeft: "4px" }}>
+                      (conc: {optimalWealthTax?.giniAtPeakRevenue.toFixed(2)})
+                    </span>
                   </div>
                   <div style={{ fontSize: "12px", color: "#e5e7eb", marginBottom: "4px" }}>
-                    Min concentration: <strong>{optimalWealthTax?.minGiniRate.toFixed(0)}%</strong> → {optimalWealthTax?.minGini.toFixed(2)}
+                    <strong>Peak effort signal:</strong> {optimalWealthTax?.peakMIRate.toFixed(0)}%
+                    <span style={{ color: "#f472b6", marginLeft: "4px" }}>
+                      (MI: {optimalWealthTax?.peakMI.toFixed(3)} bits)
+                    </span>
                   </div>
                   <div style={{ fontSize: "11px", color: "#9ca3af" }}>
-                    (baseline: {optimalWealthTax?.baseGini.toFixed(2)})
+                    Baseline MI: {optimalWealthTax?.baseMI.toFixed(3)} bits
                   </div>
                 </div>
               </div>
-              <div className="text-xs text-muted mt-2">
-                Lower dashed line = fairer allocation. In high-α regimes, wealth taxes often reduce concentration more effectively.
+              <div className="text-xs text-muted mt-3" style={{ lineHeight: 1.5 }}>
+                <strong>Peak effort signal</strong> = tax rate where MI is highest (effort is most informative about reward). 
+                The paper argues this matters more than inequality per se.
               </div>
             </div>
 
