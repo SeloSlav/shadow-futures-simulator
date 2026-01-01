@@ -863,30 +863,39 @@ export default function EdgeOfChaosExplorer() {
       </div>
 
       <Card className="info-card">
-          <CardContent className="p-5 space-y-4">
-            <div className="section-title">
-              Phase Transition Map
-              {isPending && <span className="text-xs text-muted ml-2">(Updating...)</span>}
-            </div>
-            <div className="text-sm text-muted leading-relaxed mb-4">
-              This map shows how different combinations of reinforcement (α) and effort weight (λ) create distinct regimes.
-              Your current position is marked with a white ring. Move from blue (ordered, effort matters) toward red (chaotic, lock-in dominates).
+          <CardContent className="p-6 space-y-6">
+            <div>
+              <div className="section-title" style={{ fontSize: "18px", marginBottom: "8px" }}>
+                Phase Transition Map
+                {isPending && <span className="text-xs text-muted ml-2">(Updating...)</span>}
+              </div>
+              <p style={{ fontSize: "14px", color: "#b0b0b0", lineHeight: 1.6 }}>
+                Each cell shows the system behavior at that (α, λ) combination. 
+                The <span style={{ 
+                  backgroundColor: "#fbbf24", 
+                  color: "#000", 
+                  padding: "2px 8px", 
+                  borderRadius: "4px",
+                  fontWeight: 600
+                }}>highlighted cell</span> is your current position. Hover any cell for details.
+              </p>
             </div>
             
             {/* Custom heatmap-style phase diagram */}
-            <div style={{ width: "100%", maxWidth: "500px", margin: "0 auto" }}>
+            <div style={{ width: "100%", maxWidth: "520px", margin: "0 auto" }}>
               {/* Main grid with axes */}
               <div style={{ display: "flex", alignItems: "stretch" }}>
                 {/* Y-axis label (rotated) */}
                 <div style={{ 
                   writingMode: "vertical-rl", 
                   transform: "rotate(180deg)", 
-                  fontSize: "12px", 
-                  color: "#9ca3af",
+                  fontSize: "13px", 
+                  color: "#d1d5db",
+                  fontWeight: 500,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  paddingRight: "4px"
+                  paddingRight: "8px"
                 }}>
                   λ (Effort Weight) →
                 </div>
@@ -896,12 +905,12 @@ export default function EdgeOfChaosExplorer() {
                   display: "flex", 
                   flexDirection: "column", 
                   justifyContent: "space-between", 
-                  fontSize: "11px", 
+                  fontSize: "12px", 
                   color: "#9ca3af",
-                  paddingRight: "6px",
-                  height: "300px",
+                  paddingRight: "8px",
+                  height: "320px",
                   textAlign: "right",
-                  minWidth: "28px"
+                  minWidth: "32px"
                 }}>
                   <span>2.0</span>
                   <span>1.5</span>
@@ -911,7 +920,7 @@ export default function EdgeOfChaosExplorer() {
                 </div>
                 
                 {/* The actual grid */}
-                <div style={{ position: "relative", flex: 1, height: "300px" }}>
+                <div style={{ position: "relative", flex: 1, height: "320px" }}>
                   <div 
                     style={{ 
                       display: "grid",
@@ -919,8 +928,10 @@ export default function EdgeOfChaosExplorer() {
                       gridTemplateRows: "repeat(10, 1fr)",
                       width: "100%",
                       height: "100%",
-                      gap: "1px",
-                      backgroundColor: "rgba(0,0,0,0.3)"
+                      gap: "2px",
+                      backgroundColor: "rgba(0,0,0,0.4)",
+                      borderRadius: "4px",
+                      padding: "2px"
                     }}
                   >
                     {phaseTransitionData.map((point, idx) => {
@@ -936,39 +947,44 @@ export default function EdgeOfChaosExplorer() {
                         <div
                           key={idx}
                           style={{ 
-                            backgroundColor: point.color,
+                            backgroundColor: isCurrentCell ? "#fbbf24" : point.color,
                             cursor: "pointer",
-                            transition: "filter 0.15s",
-                            border: isCurrentCell ? "3px solid white" : "none",
-                            boxShadow: isCurrentCell ? "0 0 12px rgba(255,255,255,0.8), inset 0 0 8px rgba(255,255,255,0.3)" : "none",
-                            borderRadius: isCurrentCell ? "4px" : "0",
+                            transition: "all 0.15s ease",
+                            borderRadius: "3px",
                             position: "relative",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: isCurrentCell ? "0 0 0 3px #fbbf24, 0 0 20px rgba(251, 191, 36, 0.6)" : "none",
+                            transform: isCurrentCell ? "scale(1.1)" : "scale(1)",
                             zIndex: isCurrentCell ? 10 : 1
                           }}
                           title={`${point.regime}\nα=${point.alpha.toFixed(1)}, λ=${point.lambda.toFixed(1)}\nMI: ${point.mi.toFixed(3)} bits | Gini: ${point.gini.toFixed(3)}`}
-                          onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(1.3)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.filter = "brightness(1)")}
-                        />
+                          onMouseEnter={(e) => {
+                            if (!isCurrentCell) {
+                              e.currentTarget.style.transform = "scale(1.08)";
+                              e.currentTarget.style.zIndex = "5";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isCurrentCell) {
+                              e.currentTarget.style.transform = "scale(1)";
+                              e.currentTarget.style.zIndex = "1";
+                            }
+                          }}
+                        >
+                          {isCurrentCell && (
+                            <span style={{ 
+                              fontSize: "14px", 
+                              fontWeight: "bold",
+                              color: "#000",
+                              textShadow: "0 0 4px rgba(255,255,255,0.5)"
+                            }}>●</span>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
-                  
-                  {/* Current position crosshair marker */}
-                  <div 
-                    style={{
-                      position: "absolute",
-                      left: `${(alpha / 2) * 100}%`,
-                      bottom: `${(lambda / 2) * 100}%`,
-                      transform: "translate(-50%, 50%)",
-                      width: "20px",
-                      height: "20px",
-                      border: "3px solid white",
-                      borderRadius: "50%",
-                      boxShadow: "0 0 12px rgba(255,255,255,0.9), 0 0 4px rgba(0,0,0,0.8)",
-                      pointerEvents: "none",
-                      zIndex: 20
-                    }}
-                  />
                 </div>
               </div>
               
@@ -976,10 +992,10 @@ export default function EdgeOfChaosExplorer() {
               <div style={{ 
                 display: "flex", 
                 justifyContent: "space-between", 
-                fontSize: "11px", 
+                fontSize: "12px", 
                 color: "#9ca3af",
-                paddingTop: "6px",
-                marginLeft: "52px"
+                paddingTop: "8px",
+                marginLeft: "58px"
               }}>
                 <span>0.0</span>
                 <span>0.5</span>
@@ -989,61 +1005,108 @@ export default function EdgeOfChaosExplorer() {
               </div>
               
               {/* X-axis label */}
-              <div style={{ textAlign: "center", fontSize: "12px", color: "#9ca3af", marginTop: "4px", marginLeft: "52px" }}>
+              <div style={{ textAlign: "center", fontSize: "13px", color: "#d1d5db", fontWeight: 500, marginTop: "6px", marginLeft: "58px" }}>
                 α (Reinforcement) →
               </div>
             </div>
             
-            {/* Legend */}
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "16px", fontSize: "12px", marginTop: "16px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <div style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: "#3b82f6" }}></div>
-                <span style={{ color: "#d1d5db" }}>Ordered</span>
+            {/* Legend - horizontal color key */}
+            <div style={{ 
+              display: "flex", 
+              flexWrap: "wrap", 
+              justifyContent: "center", 
+              gap: "16px", 
+              padding: "16px",
+              backgroundColor: "rgba(0, 0, 0, 0.2)",
+              borderRadius: "8px"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "20px", height: "20px", borderRadius: "4px", backgroundColor: "#3b82f6" }}></div>
+                <span style={{ color: "#e5e7eb", fontSize: "13px" }}>Ordered</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <div style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: "#10b981" }}></div>
-                <span style={{ color: "#d1d5db" }}>Periodic</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "20px", height: "20px", borderRadius: "4px", backgroundColor: "#10b981" }}></div>
+                <span style={{ color: "#e5e7eb", fontSize: "13px" }}>Periodic</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <div style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: "#f59e0b" }}></div>
-                <span style={{ color: "#d1d5db" }}>Edge of Chaos</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "20px", height: "20px", borderRadius: "4px", backgroundColor: "#f59e0b" }}></div>
+                <span style={{ color: "#e5e7eb", fontSize: "13px" }}>Edge of Chaos</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <div style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: "#ef4444" }}></div>
-                <span style={{ color: "#d1d5db" }}>Chaotic</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "20px", height: "20px", borderRadius: "4px", backgroundColor: "#ef4444" }}></div>
+                <span style={{ color: "#e5e7eb", fontSize: "13px" }}>Chaotic</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <div style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: "#8b5cf6" }}></div>
-                <span style={{ color: "#d1d5db" }}>Transitional</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "20px", height: "20px", borderRadius: "4px", backgroundColor: "#8b5cf6" }}></div>
+                <span style={{ color: "#e5e7eb", fontSize: "13px" }}>Transitional</span>
+              </div>
+            </div>
+
+            {/* What the regimes mean */}
+            <div style={{ 
+              backgroundColor: "rgba(55, 65, 81, 0.4)", 
+              borderRadius: "8px", 
+              padding: "20px",
+              border: "1px solid rgba(255,255,255,0.1)"
+            }}>
+              <h4 style={{ color: "#f3f4f6", fontSize: "15px", fontWeight: 600, marginBottom: "16px" }}>
+                What Each Regime Means
+              </h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div style={{ padding: "12px", backgroundColor: "rgba(59, 130, 246, 0.15)", borderRadius: "6px", borderLeft: "3px solid #3b82f6" }}>
+                  <div style={{ color: "#60a5fa", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>Ordered</div>
+                  <div style={{ color: "#d1d5db", fontSize: "13px", lineHeight: 1.5 }}>Effort directly leads to reward. Predictable, meritocratic outcomes.</div>
+                </div>
+                <div style={{ padding: "12px", backgroundColor: "rgba(16, 185, 129, 0.15)", borderRadius: "6px", borderLeft: "3px solid #10b981" }}>
+                  <div style={{ color: "#34d399", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>Periodic</div>
+                  <div style={{ color: "#d1d5db", fontSize: "13px", lineHeight: 1.5 }}>Effort matters, but cycles and patterns emerge over time.</div>
+                </div>
+                <div style={{ padding: "12px", backgroundColor: "rgba(245, 158, 11, 0.15)", borderRadius: "6px", borderLeft: "3px solid #f59e0b" }}>
+                  <div style={{ color: "#fbbf24", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>Edge of Chaos</div>
+                  <div style={{ color: "#d1d5db", fontSize: "13px", lineHeight: 1.5 }}>Balanced tension between order and chaos. Maximum adaptability.</div>
+                </div>
+                <div style={{ padding: "12px", backgroundColor: "rgba(239, 68, 68, 0.15)", borderRadius: "6px", borderLeft: "3px solid #ef4444" }}>
+                  <div style={{ color: "#f87171", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>Chaotic</div>
+                  <div style={{ color: "#d1d5db", fontSize: "13px", lineHeight: 1.5 }}>Winner-take-all lock-in. Effort becomes uninformative.</div>
+                </div>
+              </div>
+              <div style={{ marginTop: "12px", padding: "12px", backgroundColor: "rgba(139, 92, 246, 0.15)", borderRadius: "6px", borderLeft: "3px solid #8b5cf6" }}>
+                <div style={{ color: "#a78bfa", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>Transitional</div>
+                <div style={{ color: "#d1d5db", fontSize: "13px", lineHeight: 1.5 }}>Boundary zones between regimes. Mixed dynamics with features of adjacent states.</div>
               </div>
             </div>
             
-            {/* Interpretation guide */}
+            {/* Navigation guide - 4 corners */}
             <div style={{ 
-              display: "grid", 
-              gridTemplateColumns: "1fr 1fr", 
-              gap: "16px", 
-              fontSize: "12px", 
-              marginTop: "16px", 
-              padding: "12px", 
-              backgroundColor: "rgba(55, 65, 81, 0.5)", 
-              borderRadius: "6px" 
+              backgroundColor: "rgba(0, 0, 0, 0.25)", 
+              borderRadius: "8px", 
+              padding: "20px",
+              border: "1px solid rgba(255,255,255,0.08)"
             }}>
-              <div>
-                <div style={{ fontWeight: 600, color: "#60a5fa", marginBottom: "4px" }}>↙ Bottom-Left (Low α, Low λ)</div>
-                <div style={{ color: "#9ca3af" }}>Random allocation, no patterns</div>
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, color: "#f87171", marginBottom: "4px" }}>↘ Bottom-Right (High α, Low λ)</div>
-                <div style={{ color: "#9ca3af" }}>Winner-take-all lock-in</div>
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, color: "#60a5fa", marginBottom: "4px" }}>↖ Top-Left (Low α, High λ)</div>
-                <div style={{ color: "#9ca3af" }}>Effort-based meritocracy</div>
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, color: "#fbbf24", marginBottom: "4px" }}>↗ Top-Right (High α, High λ)</div>
-                <div style={{ color: "#9ca3af" }}>Tension zone / edge of chaos</div>
+              <h4 style={{ color: "#f3f4f6", fontSize: "15px", fontWeight: 600, marginBottom: "16px" }}>
+                How to Navigate the Map
+              </h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div style={{ padding: "12px", backgroundColor: "rgba(96, 165, 250, 0.1)", borderRadius: "6px" }}>
+                  <div style={{ color: "#60a5fa", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>↖ Top-Left</div>
+                  <div style={{ color: "#9ca3af", fontSize: "13px" }}>Low α, High λ</div>
+                  <div style={{ color: "#e5e7eb", fontSize: "13px", marginTop: "4px" }}><strong>Meritocracy</strong> — Hard work reliably pays off</div>
+                </div>
+                <div style={{ padding: "12px", backgroundColor: "rgba(251, 191, 36, 0.1)", borderRadius: "6px" }}>
+                  <div style={{ color: "#fbbf24", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>↗ Top-Right</div>
+                  <div style={{ color: "#9ca3af", fontSize: "13px" }}>High α, High λ</div>
+                  <div style={{ color: "#e5e7eb", fontSize: "13px", marginTop: "4px" }}><strong>Tension Zone</strong> — Effort and advantage compete</div>
+                </div>
+                <div style={{ padding: "12px", backgroundColor: "rgba(167, 139, 250, 0.1)", borderRadius: "6px" }}>
+                  <div style={{ color: "#a78bfa", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>↙ Bottom-Left</div>
+                  <div style={{ color: "#9ca3af", fontSize: "13px" }}>Low α, Low λ</div>
+                  <div style={{ color: "#e5e7eb", fontSize: "13px", marginTop: "4px" }}><strong>Random</strong> — Neither effort nor history matters</div>
+                </div>
+                <div style={{ padding: "12px", backgroundColor: "rgba(248, 113, 113, 0.1)", borderRadius: "6px" }}>
+                  <div style={{ color: "#f87171", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>↘ Bottom-Right</div>
+                  <div style={{ color: "#9ca3af", fontSize: "13px" }}>High α, Low λ</div>
+                  <div style={{ color: "#e5e7eb", fontSize: "13px", marginTop: "4px" }}><strong>Lock-in</strong> — Early winners dominate forever</div>
+                </div>
               </div>
             </div>
           </CardContent>
