@@ -1,0 +1,176 @@
+---
+alwaysApply: true
+---
+
+Shadow Futures: Why Verifiable Work Cannot Signal
+Value in Path-Dependent Economies
+Martin Erlic
+
+Abstract
+This paper studies whether verifiable work can serve as a reliable signal of value in economies characterized by path dependence and increasing returns. We present a minimal model in which agents perform observable and perfectly verifiable effort, summarized by a public work transcript, while rewards are allocated through a reinforcing network process, and show that even under perfect transparency work is informationally non-identifying. As reinforcement compounds, the mutual information between work and reward can collapse asymptotically to zero, even under perfect measurement. We introduce the concept of shadow futures, defined as unrealized but observationally indistinguishable effort trajectories that fail due solely to unfavorable timing or network position. The existence of shadow futures implies that observed success cannot be causally attributed to work even ex post, because identical verified effort histories are compatible with both success and failure. This failure of attribution is structural and does not depend on noise, manipulation, or institutional weakness. Applications include labor markets, scientific publishing, digital platforms, and proof-of-work systems, where verification mechanisms persist despite the loss of causal and informational content.
+
+1. Introduction
+In many economic settings, work is treated as a reliable signal of value. Labor contracts, academic careers, platform rankings, and cryptographic protocols are all built on the assumption that effort can be verified and that verification meaningfully distinguishes merit from chance. When outcomes differ, it is commonly inferred that differences in work must explain them. This assumption is increasingly difficult to reconcile with observed outcomes in modern networked economies. Across digital labor markets, scientific publishing, creative platforms, and proof-of-work based cryptocurrencies, large and persistent disparities emerge among agents who appear to exert comparable effort. Early success compounds, late entry is penalized, and rewards concentrate in ways that do not reverse with additional work (Arthur, 1989; Barabási and Albert, 1999).
+Existing work on increasing returns, cumulative advantage, and preferential attachment explains why outcomes concentrate over time. This paper asks a different question: whether, even under perfect transparency and perfect verification of effort, realized outcomes retain any recoverable information about work once allocation is governed by a path-dependent state. The analysis shows that in reinforcement-dominated systems, transparency does not restore attribution. Instead, verification persists while informational content collapses.
+A common intuition is that work is still decisive but imperfectly measured. Under this view, better verification, more granular metrics, or cryptographic proofs should restore the link between effort and reward. This paper argues that this intuition is false in a broad and important class of economic systems.
+We show that in economies governed by increasing returns to scale and preferential attachment, work is not merely difficult to measure. It is informationally non-identifying. Even when work is perfectly verifiable, it can contain no recoverable information about realized outcomes once path dependence dominates allocation. This failure is structural and does not depend on noise, manipulation, or institutional weakness.
+The mechanism is simple. In path-dependent systems, rewards are determined primarily by network position and timing rather than by marginal effort. Early stochastic advantages are reinforced, while later effort encounters diminishing returns that cannot be overcome by additional work. As a result, similar or even higher verified effort can produce radically different outcomes, and observed success cannot be causally attributed to effort alone.
+Recent work on non-ergodic growth processes shows that individual outcomes need not reflect expected returns and that ensemble averages can mislead agent-level reasoning (Peters, 2019). That perspective concerns how agents should optimize in multiplicative environments. The present analysis addresses a different problem: observer inference. It asks whether an external verifier can recover the causal contribution of effort from realized outcomes once allocation is path-dependent. Even when effort is perfectly observed and optimization is irrelevant, attribution can fail.
+We formalize this result using a minimal model in which effort is perfectly verifiable via a public work transcript, while rewards are allocated through a path-dependent reinforcement process. The key assumption of the model is not that work is unimportant, but that rewards are allocated as a function of an evolving allocation state rather than marginal effort. Using information theory, we show that when reinforcement dominates allocation, the mutual information between verified work and realized reward converges to zero as the system grows. Verification confirms that work occurred, but it does not resolve the uncertainty introduced by early stochastic realization and network position. In this sense, work verification becomes observationally equivalent to verification of entry conditions rather than value creation.
+This leads to a central concept of the paper, which we term Shadow Futures. For every realized success, there exists a large set of unrealized but indistinguishable effort trajectories that failed due solely to unfavorable timing or position. The existence of these shadow futures implies that successful proofs of work cannot be interpreted as evidence that work caused the outcome. They are historical artifacts of path dependence rather than signals of value creation.
+The contribution of this paper is threefold. First, we provide a formal impossibility result showing that no work verification scheme can reliably recover merit from realized outcomes in sufficiently path-dependent economies. Second, we introduce shadow futures as a general way to reason about causal attribution failure in non-ergodic systems. Third, we discuss the implications of this framework for labor markets, scientific publishing, digital platforms, and proof-of-work based cryptocurrencies, where verification mechanisms persist despite their declining informational content.
+The paper proceeds as follows. Section 2 introduces a minimal model of work and reward under preferential attachment. Section 3 establishes the non-identifiability of work under path dependence, derives mutual information collapse as a corollary, and discusses implications and robustness. Section 4 defines shadow futures and examines their implications for causal inference. Section 5 discusses institutional and cryptographic attempts to restore merit and explains why they fail. Section 6 concludes.
+2. A Minimal Model of Work and Path Dependence
+This section introduces a stripped-down model designed to isolate a single question: can verifiable work identify value when rewards are path-dependent? All features not required to answer this question are deliberately excluded.
+2.1 Agents and Work
+Time is discrete, indexed by t=1,2,…,T.
+At each time step, one agent enters the system.
+Each agent chooses an effort level W_i∈W and produces a verifiable work transcript V_i=g(W_i ), where g is deterministic and publicly known. For clarity, we later analyze the special case in which all agents perform identical work. This case illustrates the mechanism most starkly but is not required for the main result.
+Work is perfectly observable and costless to verify. There is no heterogeneity in skill or output quality, and effort is fully captured by the verifiable transcript. Effort does not directly alter reward probabilities except through the evolving allocation state. This restriction is imposed to isolate the role of path dependence rather than to deny the existence of local effort effects. Any failure of attribution in the model therefore cannot be attributed to measurement error, hidden action, or omitted effort channels.
+2.2 Reward Allocation
+At each time step, a single reward is allocated. Let R_i∈{0,1} denote whether agent i receives the reward.
+Rewards are allocated according to an attachment process that depends on accumulated attention or position. Let A_i (t) denote the cumulative attachment of agent i at time t.
+The probability that agent i receives the reward at time t is given by:
+Pr⁡(R_i=1∣A(t) )=(A_i (t)^α)/(∑_j▒A_j (t)^α )
+where α>0 governs the strength of path dependence.
+When α=0, rewards are uniformly random.
+When α=1, rewards follow linear preferential attachment.
+When α>1, the system exhibits increasing returns and winner take all dynamics.
+2.3 Network Evolution
+Attachment evolves according to realized rewards:
+A_i (t+1)=A_i (t)+R_i (t)
+Initial attachment is identical for all agents at entry:
+A_i (t_i )=A_0>0
+Thus, agents differ only by arrival time and stochastic realization of early rewards. No agent can increase future reward probability through additional work.
+2.4 What Is Being Verified
+A verifier observes:
+	the work performed by each agent
+	the validity of that work
+	the realized rewards
+The verifier does not observe counterfactual histories or unrealized trajectories. This constraint reflects all real verification systems, cryptographic or institutional.
+The central question is therefore precise:
+Does observing verified work reduce uncertainty about realized reward?
+The model is intentionally minimal and is not intended to represent a full economy. It isolates a single mechanism: reward allocation driven by a path-dependent state rather than marginal effort.
+2.5 Scope and Identifiability Constraint
+The results that follow are impossibility results conditional on a class of allocation rules in which rewards are measurable with respect to an evolving allocation state. We assume that reward probabilities depend on verified work only through their effect on this state, and that verifiers observe only realized work transcripts and realized outcomes. This restriction does not assume that work is unimportant, nor does it build the conclusion into the model. Rather, it reflects an informational constraint shared by all real verification systems, institutional or cryptographic: counterfactual allocation states and unrealized outcome paths are unobservable by design. The question addressed in this paper is therefore not whether alternative mechanisms could be engineered, but whether any verifier operating under these observational constraints can recover causal attribution of work once allocation is path dependent.
+3. Work–Reward Non-Identifiability
+This section establishes that verifiable work cannot identify reward in a path-dependent economy. The result is not driven by constant effort or measurement error, but by the structure of allocation (Peters, 2019).
+3.1 Observational Equivalence of Verified Work Histories
+Before stating the main non-identifiability result, we isolate a structural property of reinforcement-driven allocation processes. In path-dependent systems, verified work histories do not uniquely determine outcomes.
+Lemma 1 (Observational Equivalence under Reinforcement)
+Consider the model defined in Section 2 with preferential attachment parameter α≥1. Fix any agent i and any verifiable work transcript V_i that is independent of the allocation state at the agent’s entry time. Then there exists a set of reward histories with strictly positive probability measure such that:
+	all histories in the set are consistent with the same verified work transcript V_i;
+	in some histories the agent receives at least one reward, and in others the agent receives none; and
+	the verifier observes identical work transcripts and identical verification outcomes across these histories.
+Consequently, the mapping from verified work transcripts to realized reward outcomes is not injective.
+Proof (sketch).
+Under preferential attachment with α≥1, early stochastic realizations of reward induce persistent differences in attachment that affect all subsequent reward probabilities. Conditional on a fixed verified work transcript V_i, whether the agent receives early rewards depends on stochastic realization rather than effort. Since work does not modify the transition kernel of the allocation state, later verified effort cannot offset an unfavorable early realization. Thus, for a given V_i, both success and failure occur with positive probability. Because the verifier observes only realized transcripts and realized outcomes, these histories are observationally equivalent. ∎
+Remark.
+Lemma 1 establishes that verified work histories do not uniquely identify outcomes even ex post.
+We now state the main non-identifiability result.
+Let V_i denote the verifiable work transcript produced by agent i, and let R_i∈{0,1} denote the realized reward.
+Theorem 1 (Verification Non-Identifiability)
+Building on the observational equivalence established above, we now show that verified work is informationally non-identifying conditional on the allocation state.
+In the model defined in Section 2, reward allocation depends on work only through the path-dependent allocation state S_t, and not through marginal variation in verified effort conditional on that state. Formally, for all agents i and times t,
+Pr⁡(R_i=1∣V_i,S_t )=Pr⁡(R_i=1∣S_t ).
+That is, conditional on the network state, the verifiable work transcript carries no additional predictive power for reward.
+If work transcripts are independent of the initial state at entry, then verifiable work is non-identifying: no verification scheme based on observed work can recover the causal effect of effort on realized reward.
+Proof.
+By construction, work influences reward only through its effect on the evolving state. Conditional on that state, variation in verified work does not affect reward probabilities. Since verification mechanisms do not observe counterfactual states, work cannot be causally identified as the source of reward. The result does not depend on the specific functional form of the attachment process, only on reward allocation being driven by a path-dependent state. ∎
+Corollary 1 (Information Collapse)
+Under the conditions of Theorem 1, the mutual information between verifiable work and reward satisfies
+I(V;R)≤I(V;S_t ),
+and if V is independent of the allocation state at entry, then for any fixed agent i,
+lim┬(T→∞)⁡I(V_i; R_i )= 0, almost surely under preferential attachment with α ≥ 1.
+Verification confirms that work occurred but, under reinforcement-dominated allocation, does not reduce uncertainty about realized reward.
+The next subsection interprets the result and clarifies what verification can and cannot establish.
+3.2 Interpretation
+This result establishes that verifiable work is informationally non-identifying. Even with perfect verification, observing work provides no information about realized reward.
+The failure is not due to noise, hidden effort, or strategic manipulation. It arises because reward allocation is governed by path-dependent reinforcement rather than marginal contribution.
+Verification confirms that work occurred. It does not establish that work caused the outcome.
+3.3 Implications: Collapse of Proof of Work
+In a path-dependent economy, any mechanism that verifies work without observing counterfactual network position verifies cost rather than value.
+As system size grows and reinforcement compounds, proof of work becomes observationally equivalent to proof of entry. Allocation converges to proof of position.
+Underlying asymptotic mechanism.
+Under preferential attachment with α ≥ 1, early stochastic differences in attachment are reinforced and persist over time, while the marginal influence of later actions on reward probabilities diminishes. As the system grows, reward probability mass concentrates on a small subset of agents determined primarily by early realization and network position.
+For any effort transcript V that is independent of the allocation state at entry and does not permanently alter the transition kernel of the attachment process, conditioning on verified work does not affect the asymptotic distribution of rewards. As T→∞, the conditional distribution Pr⁡(R_i∣V_i ) converges to the unconditional distribution Pr⁡(R_i ). This behavior is a standard consequence of reinforcement-dominated, non-ergodic growth processes (Arthur, 1989; Barabási and Albert, 1999; Peters, 2019).
+3.4 Robustness: Local Effort Effects
+The result above does not require that work have no local effect. Suppose reward depends on both verifiable work and state:
+Pr⁡(R_i=1∣V_i,S_t )=λ⋅h(V_i )+(1-λ)⋅f(S_t ),
+with 0≤λ≤1.
+If reinforcement causes f(S_t ) to concentrate over time, then for any fixed λ < 1, the contribution of verified work to reward probabilities becomes asymptotically negligible. Unless effort permanently alters the transition dynamics of the allocation state, its informational contribution is dominated by accumulated position. Local effort effects may influence early outcomes, but they do not remain identifiable as the system grows.
+4. Shadow Futures and the Failure of Causal Attribution
+Section 3 established that verified work provides no information about realized reward in a path-dependent economy. This section shows why this informational failure implies a deeper causal failure. Specifically, it shows that observed success cannot be attributed to work even ex post.
+4.1 Realized Paths and Unrealized Equivalents
+The existence of unrealized but indistinguishable outcome paths follows directly from Lemma 1, which establishes that identical verified work transcripts are compatible with multiple reward histories of positive probability.
+Consider an agent who receives a reward after performing verified work. From the perspective of an observer, this outcome appears to validate the effort. However, the model implies that this interpretation is incomplete.
+For any realized history in which an agent succeeds, there exist many alternative histories in which:
+	the agent performs identical work
+	the work is perfectly verified
+	the agent fails to receive reward
+These alternative histories differ only in early stochastic realizations and network position; conditional on the observable work transcript, the trajectories are indistinguishable.
+4.2 Definition: Shadow Futures
+We define shadow futures as follows.
+Definition 1.
+A shadow future is an unrealized outcome trajectory in which an agent performs an identical verified work transcript to that of a successful agent but fails to receive reward due solely to unfavorable timing or network position.
+Shadow futures are not rare events. In systems with increasing returns, their number grows rapidly with time. As reinforcement compounds, small early differences in attachment generate large and persistent divergence in outcomes.
+Shadow futures correspond to the unrealized reward histories of positive probability established in Lemma 1 and therefore reflect a structural source of causal non-identifiability rather than a rhetorical or interpretive claim.
+4.3 Path Dependence and Exponential Divergence
+Under preferential attachment, early success increases the probability of future success, while early failure imposes a lasting disadvantage. As a result, outcome paths diverge even when inputs are identical.
+Let P denote the set of all possible reward paths consistent with an agent’s verified work. In a path-dependent system, the measure of P is dominated by failure trajectories. Successful outcomes occupy a vanishingly small subset of the total space.
+This implies that observing a successful outcome does not identify the causal role of work. Success is compatible with a large equivalence class of indistinguishable failures.
+4.4 Causal Non-Identifiability
+Causal attribution requires that changing the cause would change the outcome. In the presence of shadow futures, this condition fails.
+Holding work fixed while varying early network position produces radically different outcomes. Conversely, increasing work does not reliably change outcomes once path dependence is established.
+Therefore, verified work is not a sufficient cause of success in path-dependent systems. Conditional on participation, identical effort histories are compatible with radically different outcomes. Work may be necessary for entry, but it does not identify the causal source of success once allocation is governed by reinforcement.
+This distinguishes the present argument from normative claims about inequality or unfairness. The issue is not that work is under-rewarded. It is that work is causally non-identifying.
+4.5 Relation to Non-Ergodicity
+Shadow futures formalize the non-ergodic nature of path-dependent economies (Peters, 2019). The ensemble average of outcomes across agents does not correspond to the time average experienced by any individual agent.
+From the perspective of a single agent, repeated effort does not converge to expected reward. Instead, outcomes are locked in early and reinforced over time.
+This explains why retrospective narratives that attribute success to effort persist despite their poor predictive power. Observed success reflects realized paths, while shadow futures remain unobserved.
+4.6 Implications
+The existence of shadow futures undermines any interpretation of proof of work as proof of value. A verified effort does not imply that the effort was decisive, only that it occurred along a realized path.
+In path-dependent systems, success is evidence of position, not merit. Work verification confirms cost but does not establish causation.
+5. Why Institutions Cannot Restore Merit
+The failure of work to identify value in path-dependent economies invites an obvious response: if verification is insufficient, then institutions should improve it. Markets, platforms, and cryptographic systems have repeatedly attempted to repair the work–reward link through additional rules, credentials, and proofs (Akerlof, 1970). This section shows why such efforts fail in principle rather than in execution. These failures are not institutional mistakes but consequences of an informational constraint: institutions observe only realized paths, while the shadow futures required for causal attribution are unobservable.
+5.1 The Institutional Intuition
+Institutions that rely on work verification typically pursue one of three strategies:
+	Increase the precision of measurement.
+	Aggregate work across time or tasks.
+	Certify quality through trusted intermediaries.
+Each strategy assumes that the causal relationship between work and reward exists but is obscured by noise or incomplete information. The results above show that this assumption is incorrect in path-dependent systems.
+5.2 Measurement Does Not Recover Causality
+Improving measurement accuracy does not change the informational structure of the system. In the model, work is already perfectly observed and fully captured by the verifiable transcript. There is no hidden action or misreporting.
+Because reward allocation depends on network position rather than marginal effort, conditioning on more detailed work metrics does not reduce uncertainty about outcomes. Better measurement refines cost accounting but does not recover causal attribution.
+5.3 Aggregation Fails Under Path Dependence
+A common response to volatility is to aggregate effort over time. This is intended to allow individual performance to average out stochastic effects.
+In non-ergodic systems, aggregation fails. Early advantages dominate future outcomes, and later effort encounters diminishing returns that cannot overcome initial position. Time averages do not converge to ensemble averages.
+As a result, long-run effort does not approximate expected reward. Aggregation preserves inequality rather than correcting it.
+5.4 Certification and Reputation Reinforce Position
+Certification systems, reputational scores, and branding mechanisms are often presented as solutions to attribution failure (Merton, 1968). In practice, they act as attachment multipliers.
+Once established, certification increases visibility and access, which further increases reward probability independently of additional work. Reputation becomes endogenous to success rather than an independent signal of merit.
+This creates a feedback loop in which institutions designed to identify quality instead accelerate concentration.
+5.5 Cryptographic Verification
+Proof of work systems represent the most extreme attempt to formalize merit. They remove discretion, enforce uniform rules, and verify cost with mathematical certainty.
+However, cryptography verifies execution, not necessity. A proof confirms that work occurred, but it cannot verify that the work caused the outcome rather than coinciding with favorable network position.
+As systems scale, mining pools, platform incumbents, and early adopters acquire structural advantages. Verification persists while attribution collapses.
+In this sense, proof of work converges to proof of position. The system verifies entry conditions, not value creation.
+5.6 Structural Limits of Repair
+The failure of institutions is not accidental. It arises because all verification mechanisms observe realized paths but cannot observe shadow futures. Counterfactual outcomes are unobservable by design.
+Any mechanism that allocates reward based on realized success will reinforce early advantage in a path-dependent system. No amount of verification can distinguish between causation and coincidence when identical work histories produce divergent outcomes.
+5.7 Summary
+Institutional fixes fail because they address symptoms rather than structure. Measurement, aggregation, certification, and cryptographic proof all assume that work is a recoverable signal. In path-dependent economies, it is not.
+The problem is not insufficient verification, but the interaction between verification and path-dependent allocation. When rewards reinforce early advantage, verified work ceases to be causally informative about outcomes, even under ideal measurement. Institutional remedies that leave the underlying allocation dynamics unchanged therefore cannot recover merit.
+6. Conclusion
+This paper has shown that in economies governed by path dependence and increasing returns to scale, verifiable work cannot serve as a reliable signal of value. Even under perfect observation and fully verifiable effort—including cases of identical effort histories—work provides no information about realized reward once network effects dominate allocation.
+The analysis rests on a minimal model that isolates the role of topology. When rewards reinforce early advantage, identical work histories generate divergent outcomes. The existence of shadow futures establishes that observed success cannot be causally attributed to effort. Verification confirms that work occurred but cannot establish that it mattered.
+These results imply a structural limit to meritocratic allocation in networked systems. Institutions and cryptographic mechanisms that verify work address cost but not causation. As systems scale, they increasingly allocate reward based on position rather than contribution.
+It is important to emphasize the scope of the result. The argument is epistemic rather than moral: it concerns what can be inferred from realized outcomes in path-dependent systems, not how rewards ought to be distributed. The model does not deny the existence of local effort effects or the possibility that effort matters at the margin, particularly early in a process. Rather, it shows that once allocation is dominated by reinforcement and network position, effort ceases to be a recoverable signal of value, even under perfect verification. The contribution is therefore about the limits of causal attribution, not a claim about fairness, justice, or desert.
+The findings do not imply that work is unimportant. They imply that work alone cannot support attribution when outcomes are path-dependent. Any system that seeks to preserve fairness or causal attribution must therefore address allocation structure directly rather than rely on increasingly precise verification of effort. Verification can confirm cost, compliance, or participation, but it cannot recover causal attribution once outcomes are locked in by path dependence.
+References
+Akerlof, G. A. (1970). The market for “lemons”: Quality uncertainty and the market mechanism. The Quarterly Journal of Economics, 84(3), 488–500.
+Arthur, W. B. (1989). Competing technologies, increasing returns, and lock-in by historical events. The Economic Journal, 99(394), 116–131.
+Barabási, A.-L., and Albert, R. (1999). Emergence of scaling in random networks. Science, 286(5439), 509–512.
+Merton, R. K. (1968). The Matthew effect in science. Science, 159(3810), 56–63.
+Peters, O. (2019). The ergodicity problem in economics. Nature Physics, 15(12), 1216–1221.
+Shannon, C. E. (1948). A mathematical theory of communication. Bell System Technical Journal, 27(3), 379–423.

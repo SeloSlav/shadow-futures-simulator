@@ -14,6 +14,7 @@ import {
   CartesianGrid,
   BarChart,
   Bar,
+  ReferenceLine,
 } from "recharts";
 
 // Types
@@ -398,10 +399,12 @@ function generateTaxRevenueCurve(
     const result = simulate(params);
     const last = result.series[result.series.length - 1];
     
+    // Use Gini of reward distribution (who won how many times), not instantaneous wealth
+    // This measures fairness of allocation over time, which is what taxes actually affect
     points.push({
       rate: rate * 100, // Convert to percentage
       revenue: result.totalTaxRevenue || 0,
-      postTaxGini: last.postTaxGini || last.Gini,
+      postTaxGini: last.Gini, // Reward distribution concentration
     });
   }
   return points;
@@ -445,7 +448,7 @@ export default function EdgeOfChaosExplorer() {
         desc: "Weak reinforcement, effort visible, moderate mixing",
         interpretation:
           "Production is local and scale is limited. Output mostly tracks labor input, and advantages decay over time (moderate churn). Reinforcement is weak (low α), so early luck does not permanently dominate. Because λ is high, effort transcripts remain informative: working harder reliably increases the chance of reward.",
-        params: { alpha: 0.35, lambda: 1.2, churn: 0.012, T: 350 },
+        params: { alpha: 0.35, lambda: 1.2, churn: 0.012, T: 200 },
       },
       {
         key: "industrial",
@@ -453,7 +456,7 @@ export default function EdgeOfChaosExplorer() {
         desc: "Some scale effects, effort matters, low mixing",
         interpretation:
           "Mechanization and capital introduce scale effects. Early success helps, but effort and skill still matter. Reinforcement is present but not overwhelming (α < 1). Churn is low, so firms and workers can accumulate advantage, yet effort remains partially identifiable.",
-        params: { alpha: 0.8, lambda: 0.8, churn: 0.004, T: 500 },
+        params: { alpha: 0.8, lambda: 0.8, churn: 0.004, T: 200 },
       },
       {
         key: "platform",
@@ -461,7 +464,7 @@ export default function EdgeOfChaosExplorer() {
         desc: "Preferential attachment, weak mixing, transcripts fade",
         interpretation:
           "Digital platforms amplify visibility and network position. Preferential attachment dominates (α > 1), so early winners gain disproportionate reach. Individual effort matters locally, but its signal decays quickly. Many agents exert similar effort yet receive radically different outcomes.",
-        params: { alpha: 1.25, lambda: 0.25, churn: 0.002, T: 700 },
+        params: { alpha: 1.25, lambda: 0.25, churn: 0.002, T: 200 },
       },
       {
         key: "winner",
@@ -469,7 +472,7 @@ export default function EdgeOfChaosExplorer() {
         desc: "Strong increasing returns, near lock-in",
         interpretation:
           "Markets with extreme scale economies and low turnover. Once dominance emerges, it is rarely overturned. Reinforcement overwhelms effort, and churn is nearly absent. Work verification mainly certifies participation rather than value creation.",
-        params: { alpha: 1.6, lambda: 0.15, churn: 0.0, T: 900 },
+        params: { alpha: 1.6, lambda: 0.15, churn: 0.0, T: 200 },
       },
       {
         key: "agentic",
@@ -477,7 +480,7 @@ export default function EdgeOfChaosExplorer() {
         desc: "Extreme reinforcement, pooling, low human identifiability",
         interpretation:
           "Highly automated systems where agents, models, or capital pools act at massive scale. Reinforcement is extreme and mixing negligible. Individual human effort becomes statistically irrelevant to outcomes. Attribution collapses almost entirely.",
-        params: { alpha: 1.85, lambda: 0.05, churn: 0.0, T: 1100 },
+        params: { alpha: 1.85, lambda: 0.05, churn: 0.0, T: 200 },
       },
       {
         key: "edge",
@@ -485,7 +488,7 @@ export default function EdgeOfChaosExplorer() {
         desc: "Mixed: reinforcement + mixing keeps signals alive",
         interpretation:
           "A transitional regime near the edge of chaos. Reinforcement exists but is counterbalanced by churn and meaningful effort channels. Outcomes are neither fully random nor fully locked in. This is where effort is most informative and adaptation remains possible.",
-        params: { alpha: 1.05, lambda: 0.6, churn: 0.01, T: 600 },
+        params: { alpha: 1.05, lambda: 0.6, churn: 0.01, T: 200 },
       },
     ],
     []
@@ -524,6 +527,35 @@ export default function EdgeOfChaosExplorer() {
   const wealthTaxCurve = useMemo(() => {
     return generateTaxRevenueCurve(deferredAlpha, deferredLambda, deferredChurn, deferredT, "wealth", 1.0, 15);
   }, [deferredAlpha, deferredLambda, deferredChurn, deferredT]);
+
+  // Find optimal tax rates (max revenue and min concentration)
+  const optimalIncomeTax = useMemo(() => {
+    if (incomeTaxCurve.length === 0) return null;
+    const maxRevenue = incomeTaxCurve.reduce((max, point) => point.revenue > max.revenue ? point : max, incomeTaxCurve[0]);
+    const minGini = incomeTaxCurve.reduce((min, point) => point.postTaxGini < min.postTaxGini ? point : min, incomeTaxCurve[0]);
+    const baseGini = incomeTaxCurve[0]?.postTaxGini || 0;
+    return { 
+      peakRevenueRate: maxRevenue.rate, 
+      peakRevenue: maxRevenue.revenue,
+      minGiniRate: minGini.rate,
+      minGini: minGini.postTaxGini,
+      baseGini
+    };
+  }, [incomeTaxCurve]);
+
+  const optimalWealthTax = useMemo(() => {
+    if (wealthTaxCurve.length === 0) return null;
+    const maxRevenue = wealthTaxCurve.reduce((max, point) => point.revenue > max.revenue ? point : max, wealthTaxCurve[0]);
+    const minGini = wealthTaxCurve.reduce((min, point) => point.postTaxGini < min.postTaxGini ? point : min, wealthTaxCurve[0]);
+    const baseGini = wealthTaxCurve[0]?.postTaxGini || 0;
+    return { 
+      peakRevenueRate: maxRevenue.rate, 
+      peakRevenue: maxRevenue.revenue,
+      minGiniRate: minGini.rate,
+      minGini: minGini.postTaxGini,
+      baseGini
+    };
+  }, [wealthTaxCurve]);
 
   const last = series[series.length - 1] || { MI_bits: 0, Gini: 0, Top1: 0, Top10: 0 };
 
@@ -682,21 +714,28 @@ export default function EdgeOfChaosExplorer() {
                 </div>
               </div>
               <div className="stats-panel">
-                <div className="text-sm text-muted">Final</div>
-                <div className="text-sm">
-                  MI: <span className="font-semibold">{last.MI_bits.toFixed(3)}</span> bits
+                <div className="text-sm text-muted mb-2">Final Metrics</div>
+                <div className="text-sm flex items-center gap-2">
+                  <span style={{ width: 10, height: 10, backgroundColor: "#06b6d4", borderRadius: 2, flexShrink: 0 }}></span>
+                  <span>MI: <span className="font-semibold">{last.MI_bits.toFixed(3)}</span> bits</span>
                 </div>
-                <div className="text-sm">
-                  Gini (rewards): <span className="font-semibold">{last.Gini.toFixed(3)}</span>
+                <div className="text-sm flex items-center gap-2" title="Concentration of cumulative rewards. Compare between scenarios, not to real-world Gini.">
+                  <span style={{ width: 10, height: 10, backgroundColor: "#f472b6", borderRadius: 2, flexShrink: 0 }}></span>
+                  <span>Conc: <span className="font-semibold">{last.Gini.toFixed(3)}</span>
+                    <span className="text-xs text-muted ml-1">
+                      ({last.Gini < 0.5 ? "low" : last.Gini < 0.8 ? "mod" : "high"})
+                    </span>
+                  </span>
                 </div>
-                {(incomeTaxRate > 0 || wealthTaxRate > 0) && last.postTaxGini !== undefined && (
-                  <div className="text-sm">
-                    Gini (post-tax): <span className="font-semibold text-green-400">{last.postTaxGini.toFixed(3)}</span>
+                <div className="text-sm flex items-center gap-2">
+                  <span style={{ width: 10, height: 10, backgroundColor: "#a78bfa", borderRadius: 2, flexShrink: 0 }}></span>
+                  <span>Top 1%: <span className="font-semibold">{(last.Top1 * 100).toFixed(1)}%</span></span>
+                </div>
+                {(incomeTaxRate > 0 || wealthTaxRate > 0) && (
+                  <div className="text-xs text-green-400 mt-1 pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+                    Tax policy active — metrics reflect taxed allocation
                   </div>
                 )}
-                <div className="text-sm">
-                  Top1: <span className="font-semibold">{(last.Top1 * 100).toFixed(1)}%</span>
-                </div>
               </div>
             </div>
 
@@ -718,10 +757,26 @@ export default function EdgeOfChaosExplorer() {
                     labelStyle={{ color: '#fff' }}
                   />
                   <Line type="monotone" dataKey="MI_bits" stroke="#06b6d4" dot={false} name="MI (bits)" />
-                  <Line type="monotone" dataKey="Gini" stroke="#f472b6" dot={false} name="Gini" />
+                  <Line type="monotone" dataKey="Gini" stroke="#f472b6" dot={false} name="Concentration" />
                   <Line type="monotone" dataKey="Top1" stroke="#a78bfa" dot={false} name="Top 1%" />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+            
+            {/* Chart legend */}
+            <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "16px", fontSize: "12px", marginTop: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div style={{ width: "20px", height: "3px", backgroundColor: "#06b6d4" }}></div>
+                <span style={{ color: "#9ca3af" }}>MI (effort informativeness)</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div style={{ width: "20px", height: "3px", backgroundColor: "#f472b6" }}></div>
+                <span style={{ color: "#9ca3af" }}>Concentration{(incomeTaxRate > 0 || wealthTaxRate > 0) ? " (with tax policy)" : ""}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div style={{ width: "20px", height: "3px", backgroundColor: "#a78bfa" }}></div>
+                <span style={{ color: "#9ca3af" }}>Top 1% share</span>
+              </div>
             </div>
 
             <div className="space-y-4 mt-6">
@@ -731,9 +786,8 @@ export default function EdgeOfChaosExplorer() {
                   {isPending && <span className="text-xs text-muted ml-2">(Updating...)</span>}
                 </div>
                 <div className="text-sm text-muted leading-relaxed mb-4">
-                  Revenue maximization differs between tax types. Income taxes capture flows but can reduce incentives.
-                  Wealth taxes target accumulated advantage directly, which is especially effective in high increasing returns regimes
-                  (high α) where wealth concentration is extreme. The Laffer curve shows revenue peaks at different rates.
+                  <strong>Solid lines:</strong> Tax revenue at each rate. <strong>Dashed lines:</strong> How concentrated 
+                  rewards become (lower = more equal allocation). Vertical lines mark your current settings.
                 </div>
               </div>
               <div style={{ height: "300px", width: "100%", minHeight: "300px", minWidth: 0 }}>
@@ -755,7 +809,8 @@ export default function EdgeOfChaosExplorer() {
                       yAxisId="right" 
                       orientation="right"
                       stroke="#888"
-                      label={{ value: "Post-Tax Gini", angle: 90, position: "insideRight" }}
+                      domain={[0, 1]}
+                      label={{ value: "Concentration", angle: 90, position: "insideRight" }}
                     />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333' }}
@@ -786,7 +841,7 @@ export default function EdgeOfChaosExplorer() {
                       data={incomeTaxCurve} 
                       stroke="#06b6d4" 
                       strokeDasharray="5 5"
-                      name="Post-Tax Gini (Income)"
+                      name="Concentration (Income Tax)"
                       dot={false}
                     />
                     <Line 
@@ -796,15 +851,65 @@ export default function EdgeOfChaosExplorer() {
                       data={wealthTaxCurve} 
                       stroke="#f472b6" 
                       strokeDasharray="5 5"
-                      name="Post-Tax Gini (Wealth)"
+                      name="Concentration (Wealth Tax)"
                       dot={false}
                     />
+                    {incomeTaxRate > 0 && (
+                      <ReferenceLine 
+                        x={incomeTaxRate * 100} 
+                        stroke="#06b6d4" 
+                        strokeWidth={2}
+                        label={{ value: `Income: ${(incomeTaxRate * 100).toFixed(0)}%`, position: "top", fill: "#06b6d4", fontSize: 11 }}
+                      />
+                    )}
+                    {wealthTaxRate > 0 && (
+                      <ReferenceLine 
+                        x={wealthTaxRate * 100} 
+                        stroke="#f472b6" 
+                        strokeWidth={2}
+                        label={{ value: `Wealth: ${(wealthTaxRate * 100).toFixed(0)}%`, position: "top", fill: "#f472b6", fontSize: 11 }}
+                      />
+                    )}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-              <div className="text-xs text-muted">
-                Solid lines: Revenue. Dashed lines: Post-tax inequality (Gini coefficient). 
-                In high α regimes, wealth taxes can generate more revenue at lower rates while reducing inequality more effectively.
+              {/* Optimal rates summary */}
+              <div style={{ 
+                display: "grid", 
+                gridTemplateColumns: "1fr 1fr", 
+                gap: "12px", 
+                marginTop: "12px",
+                padding: "12px",
+                backgroundColor: "rgba(0,0,0,0.2)",
+                borderRadius: "8px"
+              }}>
+                <div style={{ padding: "10px", backgroundColor: "rgba(6, 182, 212, 0.1)", borderRadius: "6px", borderLeft: "3px solid #06b6d4" }}>
+                  <div style={{ fontSize: "12px", color: "#06b6d4", fontWeight: 600, marginBottom: "6px" }}>Income Tax (cyan)</div>
+                  <div style={{ fontSize: "12px", color: "#e5e7eb", marginBottom: "4px" }}>
+                    Peak revenue: <strong>{optimalIncomeTax?.peakRevenueRate.toFixed(0)}%</strong>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#e5e7eb", marginBottom: "4px" }}>
+                    Min concentration: <strong>{optimalIncomeTax?.minGiniRate.toFixed(0)}%</strong> → {optimalIncomeTax?.minGini.toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#9ca3af" }}>
+                    (baseline: {optimalIncomeTax?.baseGini.toFixed(2)})
+                  </div>
+                </div>
+                <div style={{ padding: "10px", backgroundColor: "rgba(244, 114, 182, 0.1)", borderRadius: "6px", borderLeft: "3px solid #f472b6" }}>
+                  <div style={{ fontSize: "12px", color: "#f472b6", fontWeight: 600, marginBottom: "6px" }}>Wealth Tax (pink)</div>
+                  <div style={{ fontSize: "12px", color: "#e5e7eb", marginBottom: "4px" }}>
+                    Peak revenue: <strong>{optimalWealthTax?.peakRevenueRate.toFixed(0)}%</strong>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#e5e7eb", marginBottom: "4px" }}>
+                    Min concentration: <strong>{optimalWealthTax?.minGiniRate.toFixed(0)}%</strong> → {optimalWealthTax?.minGini.toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#9ca3af" }}>
+                    (baseline: {optimalWealthTax?.baseGini.toFixed(2)})
+                  </div>
+                </div>
+              </div>
+              <div className="text-xs text-muted mt-2">
+                Lower dashed line = fairer allocation. In high-α regimes, wealth taxes often reduce concentration more effectively.
               </div>
             </div>
 
@@ -966,7 +1071,7 @@ export default function EdgeOfChaosExplorer() {
                               α = {point.alpha.toFixed(1)}, λ = {point.lambda.toFixed(1)}
                             </div>
                             <div className="phase-tooltip-metrics">
-                              MI: {point.mi.toFixed(3)} bits · Gini: {point.gini.toFixed(3)}
+                              MI: {point.mi.toFixed(3)} bits · Conc: {point.gini.toFixed(2)}
                             </div>
                           </div>
                         </div>
@@ -1072,29 +1177,28 @@ export default function EdgeOfChaosExplorer() {
               padding: "20px",
               border: "1px solid rgba(255,255,255,0.08)"
             }}>
-              <h4 style={{ color: "#f3f4f6", fontSize: "15px", fontWeight: 600, marginBottom: "16px" }}>
-                How to Navigate the Map
+              <h4 style={{ color: "#f3f4f6", fontSize: "15px", fontWeight: 600, marginBottom: "8px" }}>
+                What the α-λ Corners Mean
               </h4>
+              <p style={{ color: "#9ca3af", fontSize: "13px", marginBottom: "16px", lineHeight: 1.5 }}>
+                These are fixed interpretations of parameter space regions — they don't change between simulations.
+              </p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div style={{ padding: "12px", backgroundColor: "rgba(96, 165, 250, 0.1)", borderRadius: "6px" }}>
-                  <div style={{ color: "#60a5fa", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>↖ Top-Left</div>
-                  <div style={{ color: "#9ca3af", fontSize: "13px" }}>Low α, High λ</div>
-                  <div style={{ color: "#e5e7eb", fontSize: "13px", marginTop: "4px" }}><strong>Meritocracy</strong> — Hard work reliably pays off</div>
+                  <div style={{ color: "#60a5fa", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>↖ Low α, High λ</div>
+                  <div style={{ color: "#e5e7eb", fontSize: "13px" }}><strong>Meritocracy</strong> — Hard work reliably pays off</div>
                 </div>
                 <div style={{ padding: "12px", backgroundColor: "rgba(251, 191, 36, 0.1)", borderRadius: "6px" }}>
-                  <div style={{ color: "#fbbf24", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>↗ Top-Right</div>
-                  <div style={{ color: "#9ca3af", fontSize: "13px" }}>High α, High λ</div>
-                  <div style={{ color: "#e5e7eb", fontSize: "13px", marginTop: "4px" }}><strong>Tension Zone</strong> — Effort and advantage compete</div>
+                  <div style={{ color: "#fbbf24", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>↗ High α, High λ</div>
+                  <div style={{ color: "#e5e7eb", fontSize: "13px" }}><strong>Tension Zone</strong> — Effort and advantage compete</div>
                 </div>
                 <div style={{ padding: "12px", backgroundColor: "rgba(167, 139, 250, 0.1)", borderRadius: "6px" }}>
-                  <div style={{ color: "#a78bfa", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>↙ Bottom-Left</div>
-                  <div style={{ color: "#9ca3af", fontSize: "13px" }}>Low α, Low λ</div>
-                  <div style={{ color: "#e5e7eb", fontSize: "13px", marginTop: "4px" }}><strong>Random</strong> — Neither effort nor history matters</div>
+                  <div style={{ color: "#a78bfa", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>↙ Low α, Low λ</div>
+                  <div style={{ color: "#e5e7eb", fontSize: "13px" }}><strong>Random</strong> — Neither effort nor history matters</div>
                 </div>
                 <div style={{ padding: "12px", backgroundColor: "rgba(248, 113, 113, 0.1)", borderRadius: "6px" }}>
-                  <div style={{ color: "#f87171", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>↘ Bottom-Right</div>
-                  <div style={{ color: "#9ca3af", fontSize: "13px" }}>High α, Low λ</div>
-                  <div style={{ color: "#e5e7eb", fontSize: "13px", marginTop: "4px" }}><strong>Lock-in</strong> — Early winners dominate forever</div>
+                  <div style={{ color: "#f87171", fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>↘ High α, Low λ</div>
+                  <div style={{ color: "#e5e7eb", fontSize: "13px" }}><strong>Lock-in</strong> — Early winners dominate forever</div>
                 </div>
               </div>
             </div>
@@ -1154,6 +1258,16 @@ export default function EdgeOfChaosExplorer() {
                 </div>
               </div>
               <div>
+                <div className="font-semibold text-base mb-1">Concentration (Gini-based)</div>
+                <div className="text-muted leading-relaxed">
+                  Measures how concentrated cumulative rewards are. 0 = perfectly equal, 1 = one agent has everything.
+                  <strong className="text-yellow-500"> Important:</strong> These values are for comparing scenarios within this model, 
+                  not for comparison to real-world Gini coefficients. The model's cumulative structure and growing population 
+                  produce higher absolute values than real economies. Focus on <em>relative</em> differences: 
+                  lower concentration in Ordered vs. Chaotic regimes, and how taxes reduce concentration.
+                </div>
+              </div>
+              <div>
                 <div className="font-semibold text-base mb-1">Attachment (A)</div>
                 <div className="text-muted leading-relaxed">
                   Accumulated advantage that determines future reward probability. Each reward increases A, creating reinforcement.
@@ -1197,8 +1311,10 @@ export default function EdgeOfChaosExplorer() {
       </Card>
 
       <div className="text-xs text-muted">
-        Notes: MI is estimated by binning effort and treating reward as the event of receiving any reward. This is a visualization aid,
-        not an econometric estimator. Tax simulations use simplified models and don't account for behavioral responses or general equilibrium effects.
+        Notes: MI is estimated by binning effort and treating reward as the event of receiving any reward. 
+        Concentration values are Gini-based but should be compared <em>between scenarios</em>, not to real-world data—the model's 
+        cumulative structure produces higher absolute values. Tax simulations use simplified models and don't account for 
+        behavioral responses or general equilibrium effects. This is a visualization aid, not an econometric estimator.
       </div>
     </div>
   );
