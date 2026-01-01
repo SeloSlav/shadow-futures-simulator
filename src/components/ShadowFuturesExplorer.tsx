@@ -934,14 +934,15 @@ export default function EdgeOfChaosExplorer() {
                       padding: "2px"
                     }}
                   >
-                    {phaseTransitionData.map((point, idx) => {
-                      // Check if this cell contains the current position
-                      const cellAlphaMin = point.alpha - 0.1;
-                      const cellAlphaMax = point.alpha + 0.1;
-                      const cellLambdaMin = point.lambda - 0.1;
-                      const cellLambdaMax = point.lambda + 0.1;
-                      const isCurrentCell = alpha >= cellAlphaMin && alpha < cellAlphaMax && 
-                                           lambda >= cellLambdaMin && lambda < cellLambdaMax;
+                    {(() => {
+                      // Calculate which single cell should be highlighted (grid is 10x10, range 0-2)
+                      const alphaIdx = Math.min(9, Math.max(0, Math.floor(alpha / 0.2)));
+                      const lambdaIdx = Math.min(9, Math.max(0, Math.floor(lambda / 0.2)));
+                      // Grid is generated top-to-bottom (high λ first), so row = 9 - lambdaIdx
+                      const currentCellIdx = (9 - lambdaIdx) * 10 + alphaIdx;
+                      
+                      return phaseTransitionData.map((point, idx) => {
+                      const isCurrentCell = idx === currentCellIdx;
                       
                       return (
                         <div
@@ -970,7 +971,8 @@ export default function EdgeOfChaosExplorer() {
                           </div>
                         </div>
                       );
-                    })}
+                    });
+                    })()}
                   </div>
                 </div>
               </div>
