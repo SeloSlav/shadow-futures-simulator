@@ -621,18 +621,21 @@ export default function EdgeOfChaosExplorer() {
             <div className="space-y-2">
               <div className="text-sm font-medium">Presets</div>
               <div className="presets-grid">
-                {presets.map((p) => (
-                  <Button
-                    key={p.key}
-                    variant="outline"
-                    size="sm"
-                    className="justify-start"
-                    onClick={() => applyPreset(p)}
-                    title={p.desc}
-                  >
-                    {p.name}
-                  </Button>
-                ))}
+                {presets.map((p) => {
+                  const isActive = activePreset?.key === p.key;
+                  return (
+                    <Button
+                      key={p.key}
+                      variant={isActive ? "default" : "outline"}
+                      size="sm"
+                      className={`justify-start ${isActive ? "ring-2 ring-cyan-400 ring-offset-1 ring-offset-background" : ""}`}
+                      onClick={() => applyPreset(p)}
+                      title={p.desc}
+                    >
+                      {p.name}
+                    </Button>
+                  );
+                })}
               </div>
               <div className="text-xs text-muted">
                 These are narrative labels mapped to (α, λ, churn). They are not historical claims.
